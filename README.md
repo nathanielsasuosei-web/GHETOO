@@ -125,7 +125,7 @@ src/
   components/    Header, Footer, Player, SupportModal, TrackRow, VideoSection, …
   context/       Site, Player, Support and Toast providers
 scripts/         Demo media generator
-media/           Bundled artwork, audio and video
+public/media/    Bundled artwork, audio and video (served at /media/…)
 ```
 
 ## Deploying

@@ -35,8 +35,12 @@ export default function App() {
       <div className="loading-screen">
         <div>
           <h1 style={{ fontFamily: 'var(--serif)', fontSize: 40, marginBottom: 12 }}>The music is offline.</h1>
-          <p className="muted" style={{ marginBottom: 20 }}>
+          <p className="muted" style={{ marginBottom: 8 }}>
             {error}
+          </p>
+          <p className="muted" style={{ marginBottom: 20, fontSize: 13 }}>
+            If the site was quiet for a while the server may still be waking up — give it a
+            minute, then try again.
           </p>
           <button className="btn btn--gold" onClick={reload}>
             Try again

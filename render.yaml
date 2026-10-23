@@ -1,0 +1,22 @@
+# Render Blueprint — creates the Young Silence backend as a free web service.
+# Docs: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: young-silence-api
+    runtime: node
+    plan: free
+    autoDeploy: true
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/site
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: ARTIST_PASSWORD
+        sync: false # set this when you apply the blueprint (studio password)
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: PAYSTACK_SECRET_KEY
+        sync: false # optional — enables real card payments
+      - key: PAYSTACK_PUBLIC_KEY
+        sync: false
