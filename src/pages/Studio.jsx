@@ -9,9 +9,11 @@ import VideoManager from '../studio/VideoManager';
 import Orders from '../studio/Orders';
 import Messages from '../studio/Messages';
 import Settings from '../studio/Settings';
+import Website from '../studio/Website';
 
 const TABS = [
   { id: 'overview', label: 'Overview', icon: 'dashboard' },
+  { id: 'website', label: 'Website', icon: 'image' },
   { id: 'releases', label: 'Music', icon: 'music' },
   { id: 'videos', label: 'Videos', icon: 'video' },
   { id: 'supporters', label: 'Supporters', icon: 'wallet' },
@@ -230,6 +232,7 @@ export default function Studio() {
         </div>
 
         {active === 'overview' ? <Overview {...common} /> : null}
+        {active === 'website' ? <Website {...common} /> : null}
         {active === 'releases' ? <Releases {...common} /> : null}
         {active === 'videos' ? <VideoManager {...common} /> : null}
         {active === 'supporters' ? <Orders {...common} /> : null}

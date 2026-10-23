@@ -64,6 +64,8 @@ export const api = {
   logout: () => post('/api/admin/logout'),
   overview: () => get('/api/admin/overview'),
   saveSettings: (payload) => patch('/api/admin/settings', payload),
+  uploadSiteImage: (form, onProgress) => uploadWithProgress('/api/admin/site-images', form, onProgress),
+  resetSiteImage: (target) => del(`/api/admin/site-images/${target}`),
 
   createTrack: (form, onProgress) => uploadWithProgress('/api/admin/tracks', form, onProgress),
   updateTrack: (id, payload) => patch(`/api/admin/tracks/${id}`, payload),

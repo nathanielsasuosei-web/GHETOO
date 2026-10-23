@@ -21,8 +21,6 @@ export default function Settings({ data, refresh, toast }) {
     goalAmount: Math.round((s.goalAmount || 0) / 100),
     showRaised: s.showRaised !== false,
     contactEmail: s.contactEmail || '',
-    heroImage: s.heroImage || '',
-    portraitImage: s.portraitImage || '',
     momo: { mtn: s.momo?.mtn || '', telecel: s.momo?.telecel || '', at: s.momo?.at || '', name: s.momo?.name || '' },
     socials: {
       instagram: s.socials?.instagram || '',
@@ -53,8 +51,6 @@ export default function Settings({ data, refresh, toast }) {
         goalAmount: Math.round(Number(form.goalAmount) * 100),
         showRaised: form.showRaised,
         contactEmail: form.contactEmail,
-        heroImage: form.heroImage,
-        portraitImage: form.portraitImage,
         momo: form.momo,
         socials: form.socials,
       });
@@ -124,25 +120,12 @@ export default function Settings({ data, refresh, toast }) {
               rows={9}
             />
           </div>
-          <div className="field-row">
-            <div className="field">
-              <label htmlFor="s-hero">Hero image path</label>
-              <input
-                id="s-hero"
-                value={form.heroImage}
-                onChange={(e) => setForm({ ...form, heroImage: e.target.value })}
-                placeholder="/media/hero.jpg"
-              />
-              <div className="field__hint">Place files in /media or upload via the site folder.</div>
-            </div>
-            <div className="field">
-              <label htmlFor="s-portrait">Portrait image path</label>
-              <input
-                id="s-portrait"
-                value={form.portraitImage}
-                onChange={(e) => setForm({ ...form, portraitImage: e.target.value })}
-              />
-            </div>
+          <div className="alert alert--info" style={{ marginTop: 6 }}>
+            <Icon name="image" size={16} />
+            <span>
+              Hero and portrait photos are uploaded in the <strong>Website</strong> tab, where you can see exactly how
+              they’ll look before saving.
+            </span>
           </div>
         </div>
 

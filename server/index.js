@@ -247,6 +247,33 @@ const upload = multer({
   },
 });
 
+const siteUpload = multer({
+  storage: multer.diskStorage({
+    destination(req, file, cb) {
+      cb(null, path.join(UPLOAD_DIR, 'site'));
+    },
+    filename(req, file, cb) {
+      const target = req.body?.target === 'portrait' ? 'portrait' : 'hero';
+      cb(null, `${target}-${Date.now()}-${crypto.randomBytes(3).toString('hex')}${extFor(file.mimetype, file.originalname) || '.jpg'}`);
+    },
+  }),
+  limits: { fileSize: 18 * 1024 * 1024, files: 1 },
+  fileFilter(req, file, cb) {
+    if (file.mimetype.startsWith('image/')) return cb(null, true);
+    cb(new Error('Please choose a JPG, PNG or WebP image.'));
+  },
+});
+
+const SITE_IMAGE_TARGETS = {
+  hero: { field: 'heroImage', fallback: '/media/hero.jpg', label: 'Homepage hero' },
+  portrait: { field: 'portraitImage', fallback: '/media/portrait.jpg', label: 'Portrait photo' },
+};
+
+/** Only delete files the artist uploaded — never the artwork bundled in /media. */
+function removeUploadedSiteImage(urlPath) {
+  if (typeof urlPath === 'string' && urlPath.startsWith('/uploads/site/')) removeMedia(urlPath);
+}
+
 function uploadedUrl(file) {
   const rel = path.relative(UPLOAD_DIR, file.path).split(path.sep).join('/');
   return `/uploads/${rel}`;
@@ -598,6 +625,7 @@ app.patch('/api/admin/settings', (req, res) => {
     'currency',
     'heroImage',
     'portraitImage',
+    'heroFocus',
     'supportNote',
     'announcement',
     'cardEnabled',
@@ -616,6 +644,29 @@ app.patch('/api/admin/settings', (req, res) => {
   }
   saveNow();
   res.json({ settings: state.settings });
+});
+
+// ---- site imagery (hero + portrait)
+app.post('/api/admin/site-images', siteUpload.single('image'), (req, res) => {
+  const state = getState();
+  const target = SITE_IMAGE_TARGETS[req.body?.target] ? req.body.target : 'hero';
+  const meta = SITE_IMAGE_TARGETS[target];
+  if (!req.file) return res.status(400).json({ error: 'No image uploaded.' });
+  removeUploadedSiteImage(state.settings[meta.field]);
+  state.settings[meta.field] = uploadedUrl(req.file);
+  state.settings.heroUpdatedAt = new Date().toISOString();
+  saveNow();
+  res.json({ settings: state.settings, target, url: state.settings[meta.field] });
+});
+
+app.delete('/api/admin/site-images/:target', (req, res) => {
+  const state = getState();
+  const meta = SITE_IMAGE_TARGETS[req.params.target];
+  if (!meta) return res.status(400).json({ error: 'Unknown image.' });
+  removeUploadedSiteImage(state.settings[meta.field]);
+  state.settings[meta.field] = meta.fallback;
+  saveNow();
+  res.json({ settings: state.settings, target: req.params.target, url: meta.fallback });
 });
 
 // ---- tracks
@@ -796,6 +847,7 @@ app.post('/api/admin/messages/:id/read', (req, res) => {
 app.use('/media', express.static(PUBLIC_MEDIA, { maxAge: '7d', fallthrough: true }));
 app.use('/uploads/covers', express.static(path.join(UPLOAD_DIR, 'covers'), { maxAge: '7d', fallthrough: true }));
 app.use('/uploads/thumbs', express.static(path.join(UPLOAD_DIR, 'thumbs'), { maxAge: '7d', fallthrough: true }));
+app.use('/uploads/site', express.static(path.join(UPLOAD_DIR, 'site'), { maxAge: '1h', fallthrough: true }));
 
 if (fs.existsSync(DIST)) {
   app.use(express.static(DIST, { index: false, maxAge: '1h' }));

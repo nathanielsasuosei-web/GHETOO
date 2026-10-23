@@ -17,6 +17,7 @@ Today his sound sits somewhere between Afrobeats and alté — Twi and Pidgin la
     currency: 'GHS',
     heroImage: '/media/hero.jpg',
     portraitImage: '/media/portrait.jpg',
+    heroFocus: 'center',
     monogramImage: '/media/logo.png',
     momo: {
       mtn: '024 000 0000',

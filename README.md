@@ -30,7 +30,9 @@ No third-party CMS, no label, no gatekeepers. One Node process + a JSON file.
 - Confirm Mobile Money payments, search by reference/name/email, confirm or cancel
 - 30-day support chart, revenue by method, best-performing releases, stream counts
 - Messages inbox with reply-by-email links
-- Edit the artist profile, bio, payout numbers, goal, announcement bar and socials
+- **Website tab** — upload/replace the homepage hero photo (with a live preview, framing
+  control and "use original" reset), the portrait photo, and the hero copy + announcement bar
+- Edit the artist profile, bio, payout numbers, goal and socials
 
 ---
 
@@ -78,6 +80,16 @@ confirmed via the callback **and** a signature-verified webhook
 labelled "sandbox" so the whole flow can be tested.
 
 Set the payout numbers in **Studio → Settings → Payout numbers**.
+
+### Changing the homepage hero
+
+Go to **Studio → Website**. Pick a wide photo (2000px+ across is ideal), upload it, and the
+live preview updates before you commit. Use the framing buttons to choose whether the photo
+sits left, centre or right — the hero text always occupies the left of the frame. Uploads are
+limited to 18 MB of JPG/PNG/WebP, land in `data/uploads/site/`, and replacing a photo deletes
+the old upload (the bundled `/media` artwork is never touched). "Use original" restores the
+image shipped with the site. The hero copy, eyebrow line and announcement bar are edited in
+the same tab.
 
 ### Media
 

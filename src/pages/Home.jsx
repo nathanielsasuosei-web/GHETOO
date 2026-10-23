@@ -27,7 +27,15 @@ export default function Home() {
     <>
       <section className="hero">
         <div className="hero__bg">
-          <img src={settings.heroImage} alt="" fetchpriority="high" />
+          <img
+            src={settings.heroImage}
+            alt=""
+            fetchpriority="high"
+            style={{
+              objectPosition:
+                settings.heroFocus === 'left' ? '22% 40%' : settings.heroFocus === 'right' ? '82% 40%' : '58% 40%',
+            }}
+          />
         </div>
         <div className="container hero__inner">
           <div>
