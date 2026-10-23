@@ -10,10 +10,12 @@ async function request(path, options = {}) {
   try {
     data = text ? JSON.parse(text) : null;
   } catch {
-    data = { error: text };
+    data = null; // not JSON — usually a hosting error page from a proxy
   }
   if (!res.ok) {
-    const err = new Error(data?.error || `Request failed (${res.status})`);
+    const serverMessage =
+      data && typeof data.error === 'string' && data.error.length <= 300 ? data.error : '';
+    const err = new Error(serverMessage || `Request failed (${res.status})`);
     err.status = res.status;
     throw err;
   }

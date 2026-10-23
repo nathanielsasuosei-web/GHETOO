@@ -26,7 +26,7 @@ import {
 const ROOT = process.cwd();
 const PORT = Number(process.env.PORT || 3000);
 const DIST = path.join(ROOT, 'dist');
-const PUBLIC_MEDIA = path.join(ROOT, 'media');
+const PUBLIC_MEDIA = path.join(ROOT, 'public', 'media');
 
 const app = express();
 app.set('trust proxy', 1);

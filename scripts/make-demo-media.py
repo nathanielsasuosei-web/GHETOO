@@ -15,7 +15,7 @@ import wave
 import numpy as np
 
 SR = 44100
-OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "media", "audio")
+OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "public", "media", "audio")
 os.makedirs(OUT, exist_ok=True)
 rng = np.random.default_rng(7)
 
