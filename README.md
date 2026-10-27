@@ -13,22 +13,37 @@ No third-party CMS, no label, no gatekeepers. One Node process + a JSON file.
 
 **Public site**
 
-- Cinematic home page: hero, featured release, catalogue, videos, supporter wall, bio
+- Cinematic home page: hero, featured release, catalogue, videos, upcoming shows, merch,
+  supporter wall, bio
 - `/music` — full catalogue with genre filters, streaming player, "support from GH₵ X"
+  and per-track **lyrics** in a pop-up viewer
 - `/videos` — uploaded MP4s or YouTube/Vimeo links in a lightbox player
+- `/events` — tour dates split into upcoming and past shows, with venue, city, price note
+  and external ticket links; upcoming shows also preview on the home page
+- `/merch` — product store with photos, sizes and per-unit prices; checkout reuses the
+  MoMo/card payment flow and collects name, phone and delivery location
 - `/support` — funding goal, where-the-money-goes breakdown, supporter wall, contact form
 - `/about` — the artist's story
+- Newsletter signup in the footer of every page (deduplicated, rate-limited)
 - Persistent bottom player with seeking, volume, queue and lock-screen controls
-- Shareable `/thank-you?ref=…` receipt page with a **download link** for supporters
+- Shareable `/thank-you?ref=…` receipt page with a **download link** for supporters and a
+  delivery summary for merch orders
 
 **Artist studio (`/studio`)**
 
 - Password-protected dashboard (default `youngsilence` — change it!)
 - Upload releases (MP3/WAV/M4A/FLAC + cover art) with per-release minimum price,
-  draft/live toggle, free-streaming toggle and homepage spotlight
+  draft/live toggle, free-streaming toggle, homepage spotlight and **lyrics editor**
 - Upload videos or paste a hosted link, with thumbnails and drafts
+- **Events tab** — add shows with date/time, venue, city, price note, ticket link and
+  draft/live toggle; past shows are archived automatically
+- **Merch tab** — products with photo upload, sizes, price and drafts, plus a separate
+  merch-orders inbox where MoMo payments are confirmed (units-sold counters update on
+  confirmation, never twice)
 - Confirm Mobile Money payments, search by reference/name/email, confirm or cancel
-- 30-day support chart, revenue by method, best-performing releases, stream counts
+- 30-day support chart, revenue by method, best-performing releases, stream counts,
+  merch revenue and newsletter-subscriber stats
+- **Newsletter tab** — the subscriber list with one-click **CSV export** and removal
 - Messages inbox with reply-by-email links
 - **Website tab** — upload/replace the homepage hero photo (with a live preview, framing
   control and "use original" reset), the portrait photo, and the hero copy + announcement bar
@@ -93,8 +108,8 @@ the same tab.
 
 ### Media
 
-- Uploads go to `data/uploads/{audio,covers,videos,thumbs}` and are streamed with HTTP
-  range support so seeking works in every browser.
+- Uploads go to `data/uploads/{audio,covers,videos,thumbs,products,site}` and are streamed
+  with HTTP range support so seeking works in every browser.
 - The bundled demo tracks, artwork and videos are original assets generated for this build
   (`scripts/make-demo-media.py`) — replace them with real masters from the studio.
 - Files up to 800 MB are accepted. For production at scale, point `DATA_DIR` at a persistent
@@ -115,18 +130,27 @@ in `data/uploads`.
 server/
   index.js       Express API: site data, checkout, streaming, studio endpoints
   db.js          JSON store with debounced atomic writes
-  seed.js        Demo artist profile, releases, videos and support history
+  seed.js        Demo profile, releases, videos, events, merch, subscribers, orders
   auth.js        Signed-cookie sessions + login throttling
   media.js       Range-aware media streaming
   payments.js    Paystack client + MoMo network metadata
 src/
-  pages/         Home, Music, Videos, Support, About, ThankYou, Studio
-  studio/        Dashboard tabs (Overview, Releases, Videos, Supporters, Messages, Settings)
-  components/    Header, Footer, Player, SupportModal, TrackRow, VideoSection, …
+  pages/         Home, Music, Videos, Events, Merch, Support, About, ThankYou, Studio
+  studio/        Dashboard tabs (Overview, Releases, Videos, Events, Merch, Supporters,
+                 Messages, Newsletter, Settings, Website)
+  components/    Header, Footer, Player, SupportModal, MerchModal, LyricsModal,
+                 TrackRow, VideoSection, EventsSection, MerchSection, Newsletter, …
   context/       Site, Player, Support and Toast providers
 scripts/         Demo media generator
 public/media/    Bundled artwork, audio and video (served at /media/…)
 ```
+
+### Data collections
+
+Everything still lives in one `data/db.json`: `settings`, `tracks`, `videos`, `orders`
+(music support), `events`, `products`, `merchOrders` and `subscribers`. Merch orders are
+kept separate from support orders so fundraising stats never include shop revenue, and
+both share the same `YS-XXXXXX` references and MoMo/card confirmation flow.
 
 ## Deploying
 

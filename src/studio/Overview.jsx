@@ -53,6 +53,20 @@ export default function Overview({ data }) {
           <strong>{compact(stats.plays)}</strong>
           <em>{compact(stats.downloads)} downloads</em>
         </div>
+        <div className="stat-card">
+          <span>
+            <Icon name="bag" size={12} /> Merch revenue
+          </span>
+          <strong>{cedis(data.merchStats?.revenue || 0)}</strong>
+          <em>{data.merchStats?.orders || 0} orders · {data.merchStats?.pending || 0} awaiting</em>
+        </div>
+        <div className="stat-card">
+          <span>
+            <Icon name="send" size={12} /> Newsletter
+          </span>
+          <strong>{data.merchStats?.subscribers || 0}</strong>
+          <em>{data.merchStats?.events || 0} events listed</em>
+        </div>
       </div>
 
       <div className="panel">

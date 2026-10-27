@@ -39,6 +39,10 @@ export default function ThankYou() {
 
   const paid = order?.status === 'paid';
   const cancelled = status === 'failed';
+  const isMerch = order?.kind === 'merch';
+  const merchSummary = isMerch
+    ? order.items?.map((i) => `${i.title}${i.size ? ` (${i.size})` : ''} ×${i.qty}`).join(', ')
+    : '';
 
   return (
     <section className="thanks">
@@ -73,42 +77,62 @@ export default function ThankYou() {
               </div>
             </>
           ) : paid ? (
-            <>
-              <span className="eyebrow">Medaase · Thank you</span>
-              <h1>Your support landed</h1>
-              <p>
-                {order.amount ? `${cedis(order.amount)} received` : 'Payment received'}
-                {order.trackTitle ? ` for “${order.trackTitle}”` : ''}. Your name is on the wall
-                {order.supporterName === 'Anonymous supporter' ? ' (privately)' : ''}.
-              </p>
-              {order.trackId ? (
-                <div className="thanks__download">
-                  <img
-                    src={site?.tracks.find((t) => t.id === order.trackId)?.cover || '/media/covers/placeholder.jpg'}
-                    alt=""
-                  />
-                  <div>
-                    <h4>{order.trackTitle}</h4>
-                    <p>Your download is ready — keep it forever.</p>
-                  </div>
-                  <a
-                    className="btn btn--gold btn--sm"
-                    style={{ marginLeft: 'auto' }}
-                    href={`/api/download/${order.downloadToken}`}
-                  >
-                    <Icon name="download" size={14} /> Download
-                  </a>
+            isMerch ? (
+              <>
+                <span className="eyebrow">Order confirmed</span>
+                <h1>Your merch is on its way</h1>
+                <p>
+                  {cedis(order.amount)} received for {merchSummary}. We’ll call{' '}
+                  {order.phone || 'your number'}
+                  {order.location ? ` (${order.location})` : ''} to arrange delivery.
+                </p>
+                <div className="thanks__actions">
+                  <Link to="/merch" className="btn btn--gold">
+                    Back to the store
+                  </Link>
+                  <Link to="/music" className="btn btn--ghost">
+                    Listen while you wait
+                  </Link>
                 </div>
-              ) : null}
-              <div className="thanks__actions">
-                <Link to="/music" className="btn btn--gold">
-                  Keep listening
-                </Link>
-                <Link to="/support" className="btn btn--ghost">
-                  See the wall
-                </Link>
-              </div>
-            </>
+              </>
+            ) : (
+              <>
+                <span className="eyebrow">Medaase · Thank you</span>
+                <h1>Your support landed</h1>
+                <p>
+                  {order.amount ? `${cedis(order.amount)} received` : 'Payment received'}
+                  {order.trackTitle ? ` for “${order.trackTitle}”` : ''}. Your name is on the wall
+                  {order.supporterName === 'Anonymous supporter' ? ' (privately)' : ''}.
+                </p>
+                {order.trackId ? (
+                  <div className="thanks__download">
+                    <img
+                      src={site?.tracks.find((t) => t.id === order.trackId)?.cover || '/media/covers/placeholder.jpg'}
+                      alt=""
+                    />
+                    <div>
+                      <h4>{order.trackTitle}</h4>
+                      <p>Your download is ready — keep it forever.</p>
+                    </div>
+                    <a
+                      className="btn btn--gold btn--sm"
+                      style={{ marginLeft: 'auto' }}
+                      href={`/api/download/${order.downloadToken}`}
+                    >
+                      <Icon name="download" size={14} /> Download
+                    </a>
+                  </div>
+                ) : null}
+                <div className="thanks__actions">
+                  <Link to="/music" className="btn btn--gold">
+                    Keep listening
+                  </Link>
+                  <Link to="/support" className="btn btn--ghost">
+                    See the wall
+                  </Link>
+                </div>
+              </>
+            )
           ) : (
             <>
               <span className="eyebrow">Almost there</span>
@@ -116,17 +140,19 @@ export default function ThankYou() {
               <p>
                 {reference ? (
                   <>
-                    Reference <span className="mono" style={{ color: 'var(--gold)' }}>{reference}</span>. Mobile Money
-                    support is confirmed by the artist once the payment shows in his wallet. This page updates on its
-                    own.
+                    Reference <span className="mono" style={{ color: 'var(--gold)' }}>{reference}</span>.{' '}
+                    {isMerch
+                      ? `Mobile Money orders are confirmed once the payment shows in the wallet — then we call to arrange delivery of ${merchSummary}.`
+                      : 'Mobile Money support is confirmed by the artist once the payment shows in his wallet.'}{' '}
+                    This page updates on its own.
                   </>
                 ) : (
                   'No payment reference was found. If you paid, message the artist with your MoMo receipt.'
                 )}
               </p>
               <div className="thanks__actions">
-                <Link to="/music" className="btn btn--ghost">
-                  Back to the music
+                <Link to={isMerch ? '/merch' : '/music'} className="btn btn--ghost">
+                  {isMerch ? 'Back to the store' : 'Back to the music'}
                 </Link>
                 <Link to="/support" className="btn btn--ghost">
                   Contact

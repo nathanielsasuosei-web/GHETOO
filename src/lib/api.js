@@ -60,6 +60,29 @@ export const api = {
   createOrder: (payload) => post('/api/orders', payload),
   order: (reference) => get(`/api/orders/${encodeURIComponent(reference)}`),
   message: (payload) => post('/api/messages', payload),
+  subscribe: (email) => post('/api/subscribe', { email }),
+
+  createMerchOrder: (payload) => post('/api/merch-orders', payload),
+
+  // events
+  createEvent: (payload) => post('/api/admin/events', payload),
+  updateEvent: (id, payload) => patch(`/api/admin/events/${id}`, payload),
+  deleteEvent: (id) => del(`/api/admin/events/${id}`),
+
+  // products
+  createProduct: (form, onProgress) => uploadWithProgress('/api/admin/products', form, onProgress),
+  updateProduct: (id, payload) => patch(`/api/admin/products/${id}`, payload),
+  replaceProductImage: (id, form, onProgress) =>
+    uploadWithProgress(`/api/admin/products/${id}/image`, form, onProgress),
+  deleteProduct: (id) => del(`/api/admin/products/${id}`),
+
+  // merch orders
+  updateMerchOrder: (id, status) => patch(`/api/admin/merch-orders/${id}`, { status }),
+  deleteMerchOrder: (id) => del(`/api/admin/merch-orders/${id}`),
+
+  // newsletter
+  deleteSubscriber: (id) => del(`/api/admin/subscribers/${id}`),
+  exportSubscribers: () => '/api/admin/subscribers/export',
 
   me: () => get('/api/admin/me'),
   login: (password) => post('/api/admin/login', { password }),

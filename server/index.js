@@ -51,6 +51,12 @@ app.post('/api/payments/webhook', express.raw({ type: 'application/json' }), (re
     if (order && order.status !== 'paid') {
       markPaid(order, { paidAmount: event.data.amount, channel: event.data.channel });
       saveNow();
+      return res.sendStatus(200);
+    }
+    const merchOrder = findMerchOrder(state, event.data?.reference);
+    if (merchOrder && merchOrder.status !== 'paid') {
+      markMerchPaid(state, merchOrder, { paidAmount: event.data.amount, channel: event.data.channel });
+      saveNow();
     }
   }
   res.sendStatus(200);
@@ -135,8 +141,57 @@ function publicTrack(t) {
     downloads: t.downloads,
     featured: Boolean(t.featured),
     allowStream: t.allowStream !== false,
+    lyrics: t.lyrics || '',
     createdAt: t.createdAt,
     streamUrl: `/api/stream/${t.id}`,
+  };
+}
+
+function publicEvent(e) {
+  return {
+    id: e.id,
+    title: e.title,
+    venue: e.venue,
+    city: e.city,
+    date: e.date,
+    priceNote: e.priceNote || '',
+    ticketUrl: e.ticketUrl || '',
+    description: e.description || '',
+    createdAt: e.createdAt,
+  };
+}
+
+function publicProduct(p) {
+  return {
+    id: p.id,
+    title: p.title,
+    description: p.description || '',
+    price: p.price,
+    sizes: Array.isArray(p.sizes) ? p.sizes : [],
+    image: p.image || '/media/covers/placeholder.jpg',
+    sold: p.sold || 0,
+    createdAt: p.createdAt,
+  };
+}
+
+function publicMerchOrder(o) {
+  return {
+    id: o.id,
+    reference: o.reference,
+    kind: 'merch',
+    items: o.items || [],
+    amount: o.amount,
+    currency: o.currency || 'GHS',
+    method: o.method,
+    provider: o.provider || null,
+    supporterName: o.supporterName,
+    email: o.email || '',
+    phone: o.phone || '',
+    location: o.location || '',
+    status: o.status,
+    demo: Boolean(o.demo),
+    createdAt: o.createdAt,
+    confirmedAt: o.confirmedAt || null,
   };
 }
 
@@ -221,11 +276,30 @@ function markPaid(order, extra = {}) {
   return order;
 }
 
+function findMerchOrder(state, key) {
+  return state.merchOrders.find((o) => o.id === key || o.reference.toUpperCase() === String(key).toUpperCase());
+}
+
+/** Confirming a merch order also counts the units sold on each product. */
+function markMerchPaid(state, order, extra = {}) {
+  const wasPaid = order.status === 'paid';
+  order.status = 'paid';
+  order.confirmedAt = new Date().toISOString();
+  Object.assign(order, extra);
+  if (!wasPaid) {
+    for (const line of order.items || []) {
+      const product = state.products.find((p) => p.id === line.productId);
+      if (product) product.sold = (product.sold || 0) + (line.qty || 1);
+    }
+  }
+  return order;
+}
+
 // ---------------------------------------------------------------- uploads
 const upload = multer({
   storage: multer.diskStorage({
     destination(req, file, cb) {
-      const map = { audio: 'audio', cover: 'covers', thumb: 'thumbs', video: 'videos' };
+      const map = { audio: 'audio', cover: 'covers', thumb: 'thumbs', video: 'videos', product: 'products' };
       cb(null, path.join(UPLOAD_DIR, map[file.fieldname] || 'covers'));
     },
     filename(req, file, cb) {
@@ -240,6 +314,7 @@ const upload = multer({
       video: ['video/'],
       cover: ['image/'],
       thumb: ['image/'],
+      product: ['image/'],
     };
     const allowed = groups[file.fieldname] || [];
     if (allowed.some((prefix) => file.mimetype.startsWith(prefix))) return cb(null, true);
@@ -296,6 +371,14 @@ app.get('/api/site', (req, res) => {
       .filter((v) => v.published !== false)
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
       .map(publicVideo),
+    events: state.events
+      .filter((e) => e.published !== false)
+      .sort((a, b) => new Date(a.date) - new Date(b.date))
+      .map(publicEvent),
+    products: state.products
+      .filter((p) => p.published !== false)
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .map(publicProduct),
     wall: publicWall(state),
     stats,
     paymentMode: paymentMode(),
@@ -465,15 +548,28 @@ app.post('/api/orders', async (req, res) => {
 
 app.get('/api/orders/:reference', (req, res) => {
   const state = getState();
-  const order = state.orders.find((o) => o.reference.toUpperCase() === req.params.reference.toUpperCase());
-  if (!order) return res.status(404).json({ error: 'Order not found' });
+  const ref = req.params.reference.toUpperCase();
+  const order = state.orders.find((o) => o.reference.toUpperCase() === ref);
   res.setHeader('Cache-Control', 'no-store');
-  res.json({
-    ...publicOrder(order),
+  if (order) {
+    return res.json({
+      ...publicOrder(order),
+      momo: {
+        provider: order.provider,
+        label: MOMO_PROVIDERS[order.provider]?.label || 'Mobile money',
+        number: state.settings.momo?.[order.provider] || '',
+        name: state.settings.momo?.name || state.settings.artistName,
+      },
+    });
+  }
+  const merchOrder = findMerchOrder(state, ref);
+  if (!merchOrder) return res.status(404).json({ error: 'Order not found' });
+  return res.json({
+    ...publicMerchOrder(merchOrder),
     momo: {
-      provider: order.provider,
-      label: MOMO_PROVIDERS[order.provider]?.label || 'Mobile money',
-      number: state.settings.momo?.[order.provider] || '',
+      provider: merchOrder.provider,
+      label: MOMO_PROVIDERS[merchOrder.provider]?.label || 'Mobile money',
+      number: state.settings.momo?.[merchOrder.provider] || '',
       name: state.settings.momo?.name || state.settings.artistName,
     },
   });
@@ -525,23 +621,149 @@ app.post('/api/messages', (req, res) => {
   res.status(201).json({ ok: true });
 });
 
+// ---- newsletter
+app.post('/api/subscribe', (req, res) => {
+  if (!rateLimit(`sub:${req.ip}`, 5, 10 * 60 * 1000)) {
+    return res.status(429).json({ error: 'Too many attempts — give it a few minutes.' });
+  }
+  const state = getState();
+  const email = clampText(req.body?.email, 160).toLowerCase();
+  if (!emailOk(email)) return res.status(400).json({ error: 'That email doesn’t look right.' });
+  const already = state.subscribers.some((s) => s.email === email);
+  if (!already) {
+    state.subscribers.unshift({ id: id('sub_'), email, createdAt: new Date().toISOString() });
+    state.subscribers = state.subscribers.slice(0, 5000);
+    saveNow();
+  }
+  res.status(201).json({ ok: true, already });
+});
+
+// ---- merch checkout
+app.post('/api/merch-orders', async (req, res) => {
+  if (!rateLimit(`morder:${req.ip}`, 15, 10 * 60 * 1000)) {
+    return res.status(429).json({ error: 'Too many attempts — please wait a few minutes and try again.' });
+  }
+  const state = getState();
+  const body = req.body || {};
+  const method = body.method === 'card' ? 'card' : 'momo';
+  const provider = method === 'momo' ? String(body.provider || 'mtn') : 'card';
+  if (method === 'momo' && !MOMO_PROVIDERS[provider]) {
+    return res.status(400).json({ error: 'Choose a mobile money network.' });
+  }
+
+  const rawItems = Array.isArray(body.items) ? body.items.slice(0, 12) : [];
+  const items = [];
+  for (const line of rawItems) {
+    const product = state.products.find((p) => p.id === String(line?.productId || ''));
+    if (!product || product.published === false) {
+      return res.status(400).json({ error: 'An item in your cart is no longer available.' });
+    }
+    const qty = Math.min(5, Math.max(1, Math.round(Number(line.qty) || 0)));
+    if (!qty) continue;
+    const size = String(line.size || '').trim();
+    if (product.sizes.length && !product.sizes.includes(size)) {
+      return res.status(400).json({ error: `Pick a size for ${product.title}.` });
+    }
+    items.push({ productId: product.id, title: product.title, size, qty, unitPrice: product.price });
+  }
+  if (!items.length) return res.status(400).json({ error: 'Your cart is empty.' });
+
+  const amount = items.reduce((sum, line) => sum + line.unitPrice * line.qty, 0);
+  if (amount > PESEWA_MAX) return res.status(400).json({ error: 'That order is too large for checkout.' });
+
+  const supporterName = clampText(body.name, 80);
+  const email = clampText(body.email, 160).toLowerCase();
+  const phone = clampText(body.phone, 30);
+  const location = clampText(body.location, 200);
+  if (supporterName.length < 2) return res.status(400).json({ error: 'Add the name for the delivery.' });
+  if (phone.length < 7) return res.status(400).json({ error: 'A working phone number is needed for delivery.' });
+  if (email && !emailOk(email)) return res.status(400).json({ error: 'That email doesn’t look right.' });
+  if (method === 'card' && !email) return res.status(400).json({ error: 'An email is needed for a card receipt.' });
+
+  const order = {
+    id: id('mord_'),
+    reference: reference(),
+    kind: 'merch',
+    items,
+    amount,
+    currency: 'GHS',
+    method,
+    provider,
+    supporterName,
+    email,
+    phone,
+    location,
+    status: 'pending',
+    demo: false,
+    createdAt: new Date().toISOString(),
+    confirmedAt: null,
+  };
+
+  if (method === 'card') {
+    if (paystackEnabled()) {
+      try {
+        const origin = `${req.protocol}://${req.get('host')}`;
+        const data = await initializeCard({
+          amountPesewas: amount,
+          email,
+          reference: order.reference,
+          callbackUrl: `${origin}/api/payments/callback`,
+          metadata: { kind: 'merch', items: items.map((i) => `${i.title}${i.size ? ` (${i.size})` : ''} x${i.qty}`) },
+        });
+        order.authorizationUrl = data.authorization_url;
+        state.merchOrders.push(order);
+        saveNow();
+        return res.status(201).json({ reference: order.reference, status: order.status, mode: 'live', authorizationUrl: data.authorization_url });
+      } catch (err) {
+        return res.status(502).json({ error: `Could not start the card payment: ${err.message}` });
+      }
+    }
+    order.demo = true;
+    order.demoNote = 'Simulated card payment — no money moved.';
+    markMerchPaid(state, order);
+    state.merchOrders.push(order);
+    saveNow();
+    return res.status(201).json({ reference: order.reference, status: order.status, mode: 'sandbox', demo: true, order: publicMerchOrder(order) });
+  }
+
+  state.merchOrders.push(order);
+  saveNow();
+  return res.status(201).json({
+    reference: order.reference,
+    status: order.status,
+    mode: paymentMode(),
+    order: publicMerchOrder(order),
+    momo: {
+      provider,
+      label: MOMO_PROVIDERS[provider].label,
+      number: state.settings.momo?.[provider] || '',
+      name: state.settings.momo?.name || state.settings.artistName,
+      amount,
+      reference: order.reference,
+    },
+  });
+});
+
 // ---- paystack return + webhook
 app.get('/api/payments/callback', async (req, res) => {
   const state = getState();
   const ref = String(req.query.reference || '');
   const order = state.orders.find((o) => o.reference === ref);
-  if (!order) return res.redirect('/thank-you?status=missing');
+  const merchOrder = order ? null : findMerchOrder(state, ref);
+  if (!order && !merchOrder) return res.redirect('/thank-you?status=missing');
+  const target = order || merchOrder;
   try {
-    const data = order && (await verifyCard(ref));
-    if (data && data.status === 'success' && data.amount >= order.amount) {
-      markPaid(order, { paidAmount: data.amount, channel: data.channel });
+    const data = await verifyCard(ref);
+    if (data && data.status === 'success' && data.amount >= target.amount) {
+      if (order) markPaid(order, { paidAmount: data.amount, channel: data.channel });
+      else markMerchPaid(state, merchOrder, { paidAmount: data.amount, channel: data.channel });
       saveNow();
-      return res.redirect(`/thank-you?ref=${order.reference}`);
+      return res.redirect(`/thank-you?ref=${target.reference}`);
     }
   } catch (err) {
     console.error('paystack verify failed', err.message);
   }
-  return res.redirect(`/thank-you?status=failed&ref=${order.reference}`);
+  return res.redirect(`/thank-you?status=failed&ref=${target.reference}`);
 });
 
 
@@ -598,6 +820,15 @@ app.get('/api/admin/overview', (req, res) => {
     byTrack[key].amount += o.amount;
     byTrack[key].count += 1;
   }
+  const merchPaid = state.merchOrders.filter((o) => o.status === 'paid');
+  const merchStats = {
+    revenue: merchPaid.reduce((s, o) => s + o.amount, 0),
+    orders: merchPaid.length,
+    pending: state.merchOrders.filter((o) => o.status === 'pending').length,
+    subscribers: state.subscribers.length,
+    events: state.events.length,
+    products: state.products.length,
+  };
   res.setHeader('Cache-Control', 'no-store');
   res.json({
     settings: state.settings,
@@ -605,6 +836,11 @@ app.get('/api/admin/overview', (req, res) => {
     videos: state.videos,
     orders: state.orders.slice().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
     messages: state.messages,
+    events: state.events.slice().sort((a, b) => new Date(a.date) - new Date(b.date)),
+    products: state.products,
+    merchOrders: state.merchOrders.slice().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
+    subscribers: state.subscribers,
+    merchStats,
     stats,
     series,
     byMethod,
@@ -692,6 +928,7 @@ app.post('/api/admin/tracks', upload.fields([{ name: 'audio', maxCount: 1 }, { n
     year: Number(body.year) || new Date().getFullYear(),
     description: clampText(body.description, 1200),
     credits: clampText(body.credits, 300),
+    lyrics: clampText(body.lyrics, 8000),
     cover: coverFile ? uploadedUrl(coverFile) : '/media/covers/placeholder.jpg',
     audio: uploadedUrl(audioFile),
     duration: Number(body.duration) || 0,
@@ -714,7 +951,7 @@ app.patch('/api/admin/tracks/:id', (req, res) => {
   const track = state.tracks.find((t) => t.id === req.params.id);
   if (!track) return res.status(404).json({ error: 'Track not found' });
   const body = req.body || {};
-  const fields = ['title', 'genre', 'year', 'description', 'credits', 'minAmount', 'duration', 'featured', 'published', 'allowStream'];
+  const fields = ['title', 'genre', 'year', 'description', 'credits', 'lyrics', 'minAmount', 'duration', 'featured', 'published', 'allowStream'];
   for (const key of fields) {
     if (body[key] !== undefined) track[key] = body[key];
   }
@@ -809,6 +1046,184 @@ app.delete('/api/admin/videos/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+// ---- events
+app.post('/api/admin/events', (req, res) => {
+  const state = getState();
+  const body = req.body || {};
+  const title = clampText(body.title, 140);
+  const venue = clampText(body.venue, 120);
+  const city = clampText(body.city, 80);
+  const date = new Date(body.date);
+  if (!title || !venue || !city || Number.isNaN(date.getTime())) {
+    return res.status(400).json({ error: 'Title, venue, city and a valid date are required.' });
+  }
+  const event = {
+    id: id('evt_'),
+    title,
+    venue,
+    city,
+    date: date.toISOString(),
+    priceNote: clampText(body.priceNote, 120),
+    ticketUrl: clampText(body.ticketUrl, 300),
+    description: clampText(body.description, 1200),
+    published: body.published !== false && body.published !== 'false',
+    createdAt: new Date().toISOString(),
+  };
+  if (event.ticketUrl && !/^https?:\/\//.test(event.ticketUrl)) event.ticketUrl = `https://${event.ticketUrl}`;
+  state.events.push(event);
+  state.events.sort((a, b) => new Date(a.date) - new Date(b.date));
+  saveNow();
+  res.status(201).json({ event });
+});
+
+app.patch('/api/admin/events/:id', (req, res) => {
+  const state = getState();
+  const event = state.events.find((e) => e.id === req.params.id);
+  if (!event) return res.status(404).json({ error: 'Event not found' });
+  const body = req.body || {};
+  for (const key of ['title', 'venue', 'city', 'priceNote', 'ticketUrl', 'description', 'published']) {
+    if (body[key] !== undefined) event[key] = body[key];
+  }
+  if (body.date) {
+    const date = new Date(body.date);
+    if (!Number.isNaN(date.getTime())) event.date = date.toISOString();
+  }
+  if (event.ticketUrl && !/^https?:\/\//.test(event.ticketUrl)) event.ticketUrl = `https://${event.ticketUrl}`;
+  state.events.sort((a, b) => new Date(a.date) - new Date(b.date));
+  saveNow();
+  res.json({ event });
+});
+
+app.delete('/api/admin/events/:id', (req, res) => {
+  const state = getState();
+  const idx = state.events.findIndex((e) => e.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ error: 'Event not found' });
+  state.events.splice(idx, 1);
+  saveNow();
+  res.json({ ok: true });
+});
+
+// ---- products
+app.post('/api/admin/products', upload.single('product'), (req, res) => {
+  const state = getState();
+  const body = req.body || {};
+  const title = clampText(body.title, 140);
+  if (!title) return res.status(400).json({ error: 'A product name is required.' });
+  const price = toPesewas(body.price);
+  if (!Number.isFinite(price) || price <= 0) return res.status(400).json({ error: 'Set a price in cedis.' });
+  const sizes = String(body.sizes || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .slice(0, 12);
+  const product = {
+    id: id('prd_'),
+    title,
+    description: clampText(body.description, 1200),
+    price,
+    sizes,
+    image: req.file ? uploadedUrl(req.file) : '/media/covers/placeholder.jpg',
+    published: body.published !== 'false' && body.published !== false,
+    sold: 0,
+    createdAt: new Date().toISOString(),
+  };
+  state.products.unshift(product);
+  saveNow();
+  res.status(201).json({ product });
+});
+
+app.patch('/api/admin/products/:id', (req, res) => {
+  const state = getState();
+  const product = state.products.find((p) => p.id === req.params.id);
+  if (!product) return res.status(404).json({ error: 'Product not found' });
+  const body = req.body || {};
+  for (const key of ['title', 'description', 'published']) {
+    if (body[key] !== undefined) product[key] = body[key];
+  }
+  if (body.price !== undefined) {
+    const price = toPesewas(body.price);
+    if (Number.isFinite(price) && price > 0) product.price = price;
+  }
+  if (body.sizes !== undefined) {
+    product.sizes = String(body.sizes)
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .slice(0, 12);
+  }
+  saveNow();
+  res.json({ product });
+});
+
+app.post('/api/admin/products/:id/image', upload.single('product'), (req, res) => {
+  const state = getState();
+  const product = state.products.find((p) => p.id === req.params.id);
+  if (!product) return res.status(404).json({ error: 'Product not found' });
+  if (!req.file) return res.status(400).json({ error: 'No image uploaded.' });
+  if (product.image?.startsWith('/uploads/products/')) removeMedia(product.image);
+  product.image = uploadedUrl(req.file);
+  saveNow();
+  res.json({ product });
+});
+
+app.delete('/api/admin/products/:id', (req, res) => {
+  const state = getState();
+  const idx = state.products.findIndex((p) => p.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ error: 'Product not found' });
+  const [product] = state.products.splice(idx, 1);
+  if (product.image?.startsWith('/uploads/products/')) removeMedia(product.image);
+  saveNow();
+  res.json({ ok: true });
+});
+
+// ---- merch orders
+app.patch('/api/admin/merch-orders/:id', (req, res) => {
+  const state = getState();
+  const order = findMerchOrder(state, req.params.id);
+  if (!order) return res.status(404).json({ error: 'Order not found' });
+  const status = String(req.body?.status || '');
+  if (status === 'paid' && order.status !== 'paid') {
+    markMerchPaid(state, order, { confirmedBy: 'artist' });
+  } else if (['pending', 'cancelled'].includes(status)) {
+    order.status = status;
+    if (status === 'cancelled') order.confirmedAt = null;
+  }
+  saveNow();
+  res.json({ order: publicMerchOrder(order) });
+});
+
+app.delete('/api/admin/merch-orders/:id', (req, res) => {
+  const state = getState();
+  const idx = state.merchOrders.findIndex((o) => o.id === req.params.id || o.reference === req.params.id);
+  if (idx === -1) return res.status(404).json({ error: 'Order not found' });
+  state.merchOrders.splice(idx, 1);
+  saveNow();
+  res.json({ ok: true });
+});
+
+// ---- subscribers
+app.get('/api/admin/subscribers/export', (req, res) => {
+  const state = getState();
+  const rows = [['email', 'subscribed_at']].concat(
+    state.subscribers.map((s) => [s.email, new Date(s.createdAt).toISOString()])
+  );
+  const csv = rows
+    .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    .join('\n');
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="newsletter-subscribers.csv"');
+  res.send(csv);
+});
+
+app.delete('/api/admin/subscribers/:id', (req, res) => {
+  const state = getState();
+  const idx = state.subscribers.findIndex((s) => s.id === req.params.id || s.email === req.params.id);
+  if (idx === -1) return res.status(404).json({ error: 'Subscriber not found' });
+  state.subscribers.splice(idx, 1);
+  saveNow();
+  res.json({ ok: true });
+});
+
 // ---- orders
 app.patch('/api/admin/orders/:id', (req, res) => {
   const state = getState();
@@ -848,6 +1263,7 @@ app.use('/media', express.static(PUBLIC_MEDIA, { maxAge: '7d', fallthrough: true
 app.use('/uploads/covers', express.static(path.join(UPLOAD_DIR, 'covers'), { maxAge: '7d', fallthrough: true }));
 app.use('/uploads/thumbs', express.static(path.join(UPLOAD_DIR, 'thumbs'), { maxAge: '7d', fallthrough: true }));
 app.use('/uploads/site', express.static(path.join(UPLOAD_DIR, 'site'), { maxAge: '1h', fallthrough: true }));
+app.use('/uploads/products', express.static(path.join(UPLOAD_DIR, 'products'), { maxAge: '7d', fallthrough: true }));
 
 if (fs.existsSync(DIST)) {
   app.use(express.static(DIST, { index: false, maxAge: '1h' }));
@@ -882,7 +1298,9 @@ app.listen(PORT, '0.0.0.0', () => {
   const state = getState();
   console.log(`Young Silence · listening on http://0.0.0.0:${PORT}`);
   console.log(`Payments: ${paymentMode()} · Studio password: ${process.env.ARTIST_PASSWORD ? 'set via env' : 'youngsilence (default)'}`);
-  console.log(`${state.tracks.length} tracks · ${state.videos.length} videos · ${state.orders.length} orders`);
+  console.log(
+    `${state.tracks.length} tracks · ${state.videos.length} videos · ${state.orders.length} support orders · ${state.events.length} events · ${state.products.length} products · ${state.subscribers.length} subscribers`
+  );
 });
 
 // make sure counters are flushed on shutdown

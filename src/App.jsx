@@ -3,6 +3,8 @@ import Layout from './components/Layout';
 import Home from './pages/Home';
 import Music from './pages/Music';
 import Videos from './pages/Videos';
+import Events from './pages/Events';
+import Merch from './pages/Merch';
 import Support from './pages/Support';
 import About from './pages/About';
 import ThankYou from './pages/ThankYou';
@@ -74,6 +76,22 @@ export default function App() {
         element={
           <Shell>
             <Videos />
+          </Shell>
+        }
+      />
+      <Route
+        path="/events"
+        element={
+          <Shell>
+            <Events />
+          </Shell>
+        }
+      />
+      <Route
+        path="/merch"
+        element={
+          <Shell>
+            <Merch />
           </Shell>
         }
       />

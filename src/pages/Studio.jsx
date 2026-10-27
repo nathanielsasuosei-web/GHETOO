@@ -6,8 +6,11 @@ import { useToast } from '../context/ToastContext';
 import Overview from '../studio/Overview';
 import Releases from '../studio/Releases';
 import VideoManager from '../studio/VideoManager';
+import Events from '../studio/Events';
+import Merch from '../studio/Merch';
 import Orders from '../studio/Orders';
 import Messages from '../studio/Messages';
+import Newsletter from '../studio/Newsletter';
 import Settings from '../studio/Settings';
 import Website from '../studio/Website';
 
@@ -16,8 +19,11 @@ const TABS = [
   { id: 'website', label: 'Website', icon: 'image' },
   { id: 'releases', label: 'Music', icon: 'music' },
   { id: 'videos', label: 'Videos', icon: 'video' },
+  { id: 'events', label: 'Events', icon: 'calendar' },
+  { id: 'merch', label: 'Merch', icon: 'bag' },
   { id: 'supporters', label: 'Supporters', icon: 'wallet' },
   { id: 'messages', label: 'Messages', icon: 'mail' },
+  { id: 'newsletter', label: 'Newsletter', icon: 'send' },
   { id: 'settings', label: 'Settings', icon: 'settings' },
 ];
 
@@ -155,6 +161,7 @@ export default function Studio() {
   }
 
   const pendingCount = data.orders.filter((o) => o.status === 'pending').length;
+  const merchPending = (data.merchOrders || []).filter((o) => o.status === 'pending').length;
   const unread = data.messages.filter((m) => !m.read).length;
 
   const common = { data, refresh, toast };
@@ -180,6 +187,7 @@ export default function Studio() {
               <Icon name={t.icon} size={16} />
               {t.label}
               {t.id === 'supporters' && pendingCount ? <span className="badge">{pendingCount}</span> : null}
+              {t.id === 'merch' && merchPending ? <span className="badge">{merchPending}</span> : null}
               {t.id === 'messages' && unread ? <span className="badge">{unread}</span> : null}
             </button>
           ))}
@@ -226,6 +234,7 @@ export default function Studio() {
               >
                 {t.label}
                 {t.id === 'supporters' && pendingCount ? ` (${pendingCount})` : ''}
+                {t.id === 'merch' && merchPending ? ` (${merchPending})` : ''}
               </button>
             ))}
           </div>
@@ -235,8 +244,11 @@ export default function Studio() {
         {active === 'website' ? <Website {...common} /> : null}
         {active === 'releases' ? <Releases {...common} /> : null}
         {active === 'videos' ? <VideoManager {...common} /> : null}
+        {active === 'events' ? <Events {...common} /> : null}
+        {active === 'merch' ? <Merch {...common} /> : null}
         {active === 'supporters' ? <Orders {...common} /> : null}
         {active === 'messages' ? <Messages {...common} /> : null}
+        {active === 'newsletter' ? <Newsletter {...common} /> : null}
         {active === 'settings' ? <Settings {...common} /> : null}
       </main>
     </div>

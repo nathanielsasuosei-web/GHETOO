@@ -9,7 +9,16 @@ export const UPLOAD_DIR = path.join(DATA_DIR, 'uploads');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 const SECRET_FILE = path.join(DATA_DIR, '.secret');
 
-for (const dir of [DATA_DIR, UPLOAD_DIR, path.join(UPLOAD_DIR, 'audio'), path.join(UPLOAD_DIR, 'covers'), path.join(UPLOAD_DIR, 'videos'), path.join(UPLOAD_DIR, 'thumbs'), path.join(UPLOAD_DIR, 'site')]) {
+for (const dir of [
+  DATA_DIR,
+  UPLOAD_DIR,
+  path.join(UPLOAD_DIR, 'audio'),
+  path.join(UPLOAD_DIR, 'covers'),
+  path.join(UPLOAD_DIR, 'videos'),
+  path.join(UPLOAD_DIR, 'thumbs'),
+  path.join(UPLOAD_DIR, 'site'),
+  path.join(UPLOAD_DIR, 'products'),
+]) {
   fs.mkdirSync(dir, { recursive: true });
 }
 
@@ -36,6 +45,10 @@ export function getState() {
   state.videos ||= [];
   state.orders ||= [];
   state.messages ||= [];
+  state.events ||= [];
+  state.products ||= [];
+  state.merchOrders ||= [];
+  state.subscribers ||= [];
   return state;
 }
 

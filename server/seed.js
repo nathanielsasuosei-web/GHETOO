@@ -1,6 +1,7 @@
 const DAY = 86400000;
 
 const ago = (days, hours = 0) => new Date(Date.now() - days * DAY - hours * 3600000).toISOString();
+const inDays = (days, hours = 0) => new Date(Date.now() + days * DAY + hours * 3600000).toISOString();
 
 function baseSettings() {
   return {
@@ -59,6 +60,41 @@ export function seedState() {
         credits: 'Written by Young Silence · Produced by Kwesi Nuumo · Mixed by Ama Serwaa',
         cover: '/media/covers/accra-nights.jpg',
         audio: '/media/audio/accra-nights.mp3',
+        lyrics: `[Intro]
+Yeah… Accra after dark
+Silence on the beat
+
+[Verse 1]
+Ring Road shining under yellow light
+Circle still awake at two in the night
+Kelewele smoke and a trotro horn
+The city hums a song I was always born
+To sing — every corner knows my name
+Every gutter echo taught me how to frame
+A melody around the quiet in my chest
+Nima to Osu, I put the whole city to rest
+
+[Chorus]
+These Accra nights, they talk to me
+Neon on the water, the sea is free
+If silence is a language, then I’m fluent now
+Every light across the harbour is a crowd somehow
+These Accra nights, oh, these Accra nights
+
+[Verse 2]
+She texted “where you at?” I said “I’m in the sound”
+Studio in the bedroom, doors on lockdown
+Watchman doing rounds, he knows the routine
+Dreaming out loud past the generator screen
+
+[Chorus]
+These Accra nights, they talk to me
+Neon on the water, the sea is free
+If silence is a language, then I’m fluent now
+Every light across the harbour is a crowd somehow
+
+[Outro]
+Accra nights… I’ll be back when the morning comes`,
         duration: 42,
         minAmount: 500,
         plays: 18420,
@@ -79,6 +115,40 @@ export function seedState() {
         credits: 'Written by Young Silence · Produced by RiddimKilla · Mixed by Kofi Awuah',
         cover: '/media/covers/silence-speaks.jpg',
         audio: '/media/audio/silence-speaks.mp3',
+        lyrics: `[Intro]
+They said the quiet ones are dangerous
+Okay
+
+[Verse 1]
+Back row of the class, pen in my hand
+Writing what my mouth could never land
+Mama said speak up, I spoke in drums
+808s doing the talking when the morning comes
+Kitchen in Kanda, phone on the fridge
+One mic, one crack, one hell of a bridge
+
+[Chorus]
+Silence speaks, silence speaks
+Every word I held back turned into beats
+Silence speaks, let the record spin
+The quiet in the room is where the truth comes in
+Silence speaks
+
+[Verse 2]
+They slept on the boy, now the bed is made
+Every dream I deferred is a bill now paid
+No label, no handout, no co-sign chain
+Just the people in the front row calling my name
+
+[Chorus]
+Silence speaks, silence speaks
+Every word I held back turned into beats
+Silence speaks, let the record spin
+The quiet in the room is where the truth comes in
+
+[Outro]
+Listen…
+Yeah, silence speaks`,
         duration: 38,
         minAmount: 1000,
         plays: 31275,
@@ -181,5 +251,134 @@ export function seedState() {
       { id: 'ord_seed_8', reference: 'YS-6KX2HP', trackId: 'trk_accra_nights', trackTitle: 'Accra Nights', amount: 2500, currency: 'GHS', method: 'momo', provider: 'mtn', supporterName: 'Selorm Agbeko', email: 'selorm@example.com', message: 'From Tema with love.', anonymous: false, status: 'pending', demo: false, createdAt: ago(0, 2), confirmedAt: null },
     ],
     messages: [],
+    events: [
+      {
+        id: 'evt_accra_live',
+        title: 'Silence Made Loud — Accra Live',
+        venue: '+233 Jazz Bar & Grill',
+        city: 'Accra',
+        date: inDays(9, 4),
+        priceNote: 'GH₵ 80 advance · GH₵ 120 at the gate',
+        ticketUrl: 'https://tickets.example.com/silence-accra',
+        description: 'Full band, full catalogue and a first listen of the new EP. Limited capacity.',
+        published: true,
+        createdAt: ago(6),
+      },
+      {
+        id: 'evt_afrofuture',
+        title: 'Afro Future Saturday — guest set',
+        venue: 'Independence Square',
+        city: 'Accra',
+        date: inDays(21, 8),
+        priceNote: 'Festival wristband required',
+        ticketUrl: 'https://tickets.example.com/afro-future',
+        description: 'A 45-minute guest set on the waterfront stage. Come early.',
+        published: true,
+        createdAt: ago(4),
+      },
+      {
+        id: 'evt_kumasi',
+        title: 'Kumasi Invasion',
+        venue: 'Vienna City',
+        city: 'Kumasi',
+        date: inDays(38, 5),
+        priceNote: 'GH₵ 60 advance',
+        ticketUrl: '',
+        description: 'The first Kumasi headline show. Tickets at the venue and via MoMo.',
+        published: true,
+        createdAt: ago(2),
+      },
+      {
+        id: 'evt_hardyard',
+        title: 'Hardyard Café Sessions',
+        venue: 'Hardyard Café',
+        city: 'Accra',
+        date: ago(40),
+        priceNote: 'Free entry',
+        ticketUrl: '',
+        description: 'An acoustic Sunday set recorded for the live diaries.',
+        published: true,
+        createdAt: ago(75),
+      },
+    ],
+    products: [
+      {
+        id: 'prd_tee',
+        title: 'YS Signature Tee',
+        description: 'Heavyweight 240gsm cotton, embroidered silence mark on the chest. Unisex cut.',
+        price: 12000,
+        sizes: ['S', 'M', 'L', 'XL', 'XXL'],
+        image: '/media/covers/placeholder.jpg',
+        published: true,
+        sold: 64,
+        createdAt: ago(30),
+      },
+      {
+        id: 'prd_cap',
+        title: 'Silence Cap',
+        description: 'Low-profile six-panel cap with stitched monogram. One size, adjustable strap.',
+        price: 9000,
+        sizes: [],
+        image: '/media/covers/placeholder.jpg',
+        published: true,
+        sold: 41,
+        createdAt: ago(28),
+      },
+      {
+        id: 'prd_hoodie',
+        title: 'Accra Nights Hoodie',
+        description: 'Fleece-lined black hoodie, skyline print across the back. Limited run of 100.',
+        price: 22000,
+        sizes: ['M', 'L', 'XL', 'XXL'],
+        image: '/media/covers/placeholder.jpg',
+        published: true,
+        sold: 27,
+        createdAt: ago(12),
+      },
+    ],
+    merchOrders: [
+      {
+        id: 'mord_seed_1',
+        reference: 'YS-7KQ2NP',
+        kind: 'merch',
+        items: [{ productId: 'prd_tee', title: 'YS Signature Tee', size: 'L', qty: 1, unitPrice: 12000 }],
+        amount: 12000,
+        currency: 'GHS',
+        method: 'momo',
+        provider: 'mtn',
+        supporterName: 'Adwoa Mensah',
+        email: 'adwoa@example.com',
+        phone: '024 111 2222',
+        location: 'East Legon, Accra',
+        status: 'paid',
+        demo: false,
+        createdAt: ago(3, 2),
+        confirmedAt: ago(3, 1),
+      },
+      {
+        id: 'mord_seed_2',
+        reference: 'YS-2VX8HW',
+        kind: 'merch',
+        items: [{ productId: 'prd_cap', title: 'Silence Cap', size: '', qty: 2, unitPrice: 9000 }],
+        amount: 18000,
+        currency: 'GHS',
+        method: 'momo',
+        provider: 'telecel',
+        supporterName: 'Kojo Bentil',
+        email: 'kojo@example.com',
+        phone: '050 333 4444',
+        location: 'Tema Community 25',
+        status: 'pending',
+        demo: false,
+        createdAt: ago(0, 6),
+        confirmedAt: null,
+      },
+    ],
+    subscribers: [
+      { id: 'sub_seed_1', email: 'ama@example.com', createdAt: ago(20) },
+      { id: 'sub_seed_2', email: 'kwame@example.com', createdAt: ago(15) },
+      { id: 'sub_seed_3', email: 'naa@example.com', createdAt: ago(9) },
+      { id: 'sub_seed_4', email: 'efua@example.com', createdAt: ago(2) },
+    ],
   };
 }
