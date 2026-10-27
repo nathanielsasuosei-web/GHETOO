@@ -15,8 +15,8 @@ No third-party CMS, no label, no gatekeepers. One Node process + a JSON file.
 
 - Cinematic home page: hero, featured release, catalogue, videos, upcoming shows, merch,
   supporter wall, bio
-- `/music` — full catalogue with genre filters, streaming player, "support from GH₵ X"
-  and per-track **lyrics** in a pop-up viewer
+- `/music` — full catalogue with streaming player, "support from GH₵ X" and per-track
+  **lyrics** in a pop-up viewer
 - `/videos` — uploaded MP4s or YouTube/Vimeo links in a lightbox player
 - `/events` — tour dates split into upcoming and past shows, with venue, city, price note
   and external ticket links; upcoming shows also preview on the home page
