@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import Icon from '../components/Icon';
 import { api } from '../lib/api';
 import { cedis, compact, longDate } from '../lib/format';
@@ -9,6 +9,7 @@ const blank = {
   year: new Date().getFullYear(),
   description: '',
   credits: '',
+  lyrics: '',
   minAmount: 5,
   published: true,
   allowStream: true,
@@ -25,6 +26,8 @@ export default function Releases({ data, refresh, toast }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [editing, setEditing] = useState(null);
+  const [lyricsEdit, setLyricsEdit] = useState(null);
+  const [lyricsDraft, setLyricsDraft] = useState('');
 
   const reset = () => {
     setForm(blank);
@@ -92,6 +95,22 @@ export default function Releases({ data, refresh, toast }) {
       setEditing(null);
       await refresh();
       toast('Minimum updated');
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  };
+
+  const openLyrics = (track) => {
+    setLyricsEdit(track.id);
+    setLyricsDraft(track.lyrics || '');
+  };
+
+  const saveLyrics = async (track) => {
+    try {
+      await api.updateTrack(track.id, { lyrics: lyricsDraft });
+      setLyricsEdit(null);
+      await refresh();
+      toast('Lyrics saved');
     } catch (err) {
       toast(err.message, 'error');
     }
@@ -212,6 +231,18 @@ export default function Releases({ data, refresh, toast }) {
             />
           </div>
 
+          <div className="field">
+            <label htmlFor="r-lyrics">Lyrics</label>
+            <textarea
+              id="r-lyrics"
+              rows={8}
+              value={form.lyrics}
+              onChange={(e) => setForm({ ...form, lyrics: e.target.value })}
+              placeholder={'[Verse 1]\nFirst line of the song…\n\n[Chorus]\nThe hook…'}
+            />
+            <div className="field__hint">Line breaks are kept. Section tags like [Chorus] show on the public lyrics view.</div>
+          </div>
+
           <div className="field-row">
             <label className="upload-drop">
               <input type="file" accept="audio/*" onChange={(e) => onAudio(e.target.files?.[0] || null)} />
@@ -322,7 +353,8 @@ export default function Releases({ data, refresh, toast }) {
             </thead>
             <tbody>
               {data.tracks.map((track) => (
-                <tr key={track.id}>
+                <Fragment key={track.id}>
+                <tr>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                       <img className="table__cover" src={track.cover} alt="" />
@@ -384,6 +416,14 @@ export default function Releases({ data, refresh, toast }) {
                   <td>
                     <div className="table__actions">
                       <button
+                        className={`icon-btn icon-btn--sm ${lyricsEdit === track.id ? 'is-active' : ''}`}
+                        onClick={() => (lyricsEdit === track.id ? setLyricsEdit(null) : openLyrics(track))}
+                        title={track.lyrics ? 'Edit lyrics' : 'Add lyrics'}
+                        style={lyricsEdit === track.id ? { borderColor: 'var(--gold)', color: 'var(--gold)' } : {}}
+                      >
+                        <Icon name="mic" size={14} />
+                      </button>
+                      <button
                         className={`icon-btn icon-btn--sm ${track.featured ? 'is-active' : ''}`}
                         onClick={() => toggle(track, 'featured')}
                         title="Feature on homepage"
@@ -414,6 +454,36 @@ export default function Releases({ data, refresh, toast }) {
                     </div>
                   </td>
                 </tr>
+                {lyricsEdit === track.id ? (
+                  <tr>
+                    <td colSpan={6}>
+                      <div className="lyrics-editor">
+                        <div className="lyrics-editor__head">
+                          <strong>
+                            <Icon name="mic" size={13} /> Lyrics — {track.title}
+                          </strong>
+                          <span className="field__hint">Line breaks and [Section] tags are kept on the public page.</span>
+                        </div>
+                        <textarea
+                          rows={9}
+                          value={lyricsDraft}
+                          onChange={(e) => setLyricsDraft(e.target.value)}
+                          placeholder={'[Verse 1]\nFirst line…\n\n[Chorus]\nThe hook…'}
+                          autoFocus
+                        />
+                        <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
+                          <button className="btn btn--gold btn--sm" onClick={() => saveLyrics(track)}>
+                            <Icon name="check" size={13} /> Save lyrics
+                          </button>
+                          <button className="btn btn--ghost btn--sm" onClick={() => setLyricsEdit(null)}>
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                ) : null}
+                </Fragment>
               ))}
             </tbody>
           </table>

@@ -145,6 +145,38 @@ const paths = {
   trending: <path d="m3 17 5.5-5.5 4 4L21 7m0 0h-5.5M21 7v5.5" />,
   external: <path d="M14 4h6v6M20 4 10 14M18 14v5a1.8 1.8 0 0 1-1.8 1.8H5.8A1.8 1.8 0 0 1 4 19V8.6A1.8 1.8 0 0 1 5.8 6.8H11" />,
   quote: <path d="M9 6.5C6 7.5 4.5 10 4.5 13.5c0 2.4 1.3 4 3.3 4 1.8 0 3-1.2 3-2.9 0-1.6-1-2.7-2.5-2.7-.3 0-.6 0-.8.1.3-1.6 1.4-2.8 3-3.5L9 6.5Zm9 0c-3 1-4.5 3.5-4.5 7 0 2.4 1.3 4 3.3 4 1.8 0 3-1.2 3-2.9 0-1.6-1-2.7-2.5-2.7-.3 0-.6 0-.8.1.3-1.6 1.4-2.8 3-3.5L18 6.5Z" fill="currentColor" stroke="none" />,
+  calendar: (
+    <>
+      <rect x="3" y="5" width="18" height="16" rx="2.5" />
+      <path d="M3 9.5h18M8 3v4M16 3v4" />
+    </>
+  ),
+  pin: (
+    <>
+      <path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11Z" />
+      <circle cx="12" cy="10" r="2.5" />
+    </>
+  ),
+  ticket: (
+    <>
+      <path d="M4 8.5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4v-2Z" />
+      <path d="M14 6.5v11" strokeDasharray="2 2.5" />
+    </>
+  ),
+  bag: (
+    <>
+      <path d="M5.5 8h13l-1 12.5h-11L5.5 8Z" />
+      <path d="M9 10V7a3 3 0 0 1 6 0v3" />
+    </>
+  ),
+  send: <path d="M21 4 10 15M21 4l-6.5 16-4.5-7-7-4.5L21 4Z" />,
+  mic: (
+    <>
+      <rect x="9" y="3" width="6" height="11" rx="3" />
+      <path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" />
+    </>
+  ),
+  minus: <path d="M5 12h14" />,
 };
 
 export default function Icon({ name, size = 20, strokeWidth = 1.6, className = '', ...rest }) {

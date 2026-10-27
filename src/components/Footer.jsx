@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import Icon from './Icon';
+import Newsletter from './Newsletter';
 import { useSite } from '../context/SiteContext';
 
 const socialIcons = { instagram: 'instagram', tiktok: 'tiktok', youtube: 'youtube', x: 'x', audiomack: 'music' };
@@ -12,6 +13,10 @@ export default function Footer() {
   return (
     <footer className="footer">
       <div className="container">
+        <div className="footer__newsletter">
+          <Newsletter />
+        </div>
+
         <div className="footer__top">
           <div className="footer__brand">
             <Link to="/" className="brand">
@@ -39,7 +44,7 @@ export default function Footer() {
           </div>
 
           <div className="footer__col">
-            <h4>Listen</h4>
+            <h4>Listen & watch</h4>
             <Link to="/music">All music</Link>
             <Link to="/videos">Videos</Link>
             <Link to="/support">Support the artist</Link>
@@ -47,10 +52,17 @@ export default function Footer() {
           </div>
 
           <div className="footer__col">
-            <h4>Connect</h4>
+            <h4>Live & shop</h4>
+            <Link to="/events">Events & tour</Link>
+            <Link to="/merch">Merch store</Link>
             <a href={`mailto:${settings.contactEmail || 'hello@youngsilence.gh'}`}>Bookings & press</a>
             <Link to="/studio">Artist studio</Link>
+          </div>
+
+          <div className="footer__col">
+            <h4>Based in</h4>
             <span>{settings.city}</span>
+            <span>Independent · No label</span>
           </div>
         </div>
 

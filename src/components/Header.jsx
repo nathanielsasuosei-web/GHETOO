@@ -7,6 +7,8 @@ import { useSupport } from '../context/SupportContext';
 const links = [
   { to: '/music', label: 'Music' },
   { to: '/videos', label: 'Videos' },
+  { to: '/events', label: 'Events' },
+  { to: '/merch', label: 'Merch' },
   { to: '/support', label: 'Support' },
   { to: '/about', label: 'About' },
 ];

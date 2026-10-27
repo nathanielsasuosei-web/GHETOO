@@ -1,7 +1,11 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import Icon from '../components/Icon';
 import TrackRow from '../components/TrackRow';
 import VideoSection from '../components/VideoSection';
+import EventsSection from '../components/EventsSection';
+import MerchSection from '../components/MerchSection';
+import MerchModal from '../components/MerchModal';
 import SupportPanel from '../components/SupportPanel';
 import Wall from '../components/Wall';
 import useReveal from '../hooks/useReveal';
@@ -14,6 +18,7 @@ export default function Home() {
   const { site } = useSite();
   const { play, isCurrent, playing } = usePlayer();
   const { openSupport } = useSupport();
+  const [merchProduct, setMerchProduct] = useState(null);
   const settings = site.settings;
   const tracks = site.tracks;
   const featured = tracks.find((t) => t.featured) || tracks[0];
@@ -207,6 +212,10 @@ export default function Home() {
         </section>
       ) : null}
 
+      <EventsSection events={site.events || []} />
+
+      <MerchSection onOrder={(product) => setMerchProduct(product)} />
+
       <section className="section" id="support">
         <div className="container">
           <SupportPanel />
@@ -274,6 +283,8 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {merchProduct ? <MerchModal product={merchProduct} onClose={() => setMerchProduct(null)} /> : null}
     </>
   );
 }

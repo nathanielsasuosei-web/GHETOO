@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import Icon from './Icon';
+import LyricsModal from './LyricsModal';
 import { usePlayer } from '../context/PlayerContext';
 import { useSupport } from '../context/SupportContext';
 import { cedis, compact } from '../lib/format';
@@ -7,6 +9,7 @@ export default function TrackRow({ track, index, list }) {
   const { play, isCurrent, playing } = usePlayer();
   const { openSupport } = useSupport();
   const current = isCurrent(track.id);
+  const [showLyrics, setShowLyrics] = useState(false);
 
   return (
     <div className={`track ${current ? 'is-playing' : ''}`}>
@@ -37,6 +40,11 @@ export default function TrackRow({ track, index, list }) {
         <h3>
           {track.title}
           {track.featured ? <span className="chip" style={{ padding: '2px 8px', fontSize: 9 }}>New</span> : null}
+          {track.lyrics ? (
+            <button className="lyrics-badge" onClick={() => setShowLyrics(true)}>
+              <Icon name="mic" size={11} /> Lyrics
+            </button>
+          ) : null}
         </h3>
         <p>
           {track.genre} · {track.year}
@@ -63,6 +71,8 @@ export default function TrackRow({ track, index, list }) {
           {current && playing ? 'Pause' : 'Play'}
         </button>
       </div>
+
+      {showLyrics ? <LyricsModal track={track} onClose={() => setShowLyrics(false)} /> : null}
     </div>
   );
 }
