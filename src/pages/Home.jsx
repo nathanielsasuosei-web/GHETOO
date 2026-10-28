@@ -44,13 +44,17 @@ export default function Home() {
         </div>
         <div className="container hero__inner">
           <div>
+            {/* Tagline hidden for now
             <span className="eyebrow">{settings.tagline}</span>
+            */}
             <h1 className="hero__title">
               Young
               <br />
               <em>Silence</em>
             </h1>
+            {/* Intro hidden for now
             <p className="hero__intro">{settings.intro}</p>
+            */}
 
             <div className="hero__actions">
               {featured ? (
@@ -70,6 +74,7 @@ export default function Home() {
                 <strong>{compact(site.stats.plays)}</strong>
                 <span>Plays</span>
               </div>
+              {/* Supporter / raised stats hidden for now
               <div className="hero__stat">
                 <strong>{site.stats.supporters}</strong>
                 <span>Supporters</span>
@@ -78,6 +83,7 @@ export default function Home() {
                 <strong>{cedis(site.stats.raised)}</strong>
                 <span>Given to the art</span>
               </div>
+              */}
             </div>
           </div>
 
@@ -115,6 +121,7 @@ export default function Home() {
         <span className="scroll-hint">Scroll</span>
       </section>
 
+      {/* Marquee hidden for now
       <div className="marquee" aria-hidden="true">
         <div className="marquee__track">
           {[0, 1].map((copy) => (
@@ -125,6 +132,7 @@ export default function Home() {
           ))}
         </div>
       </div>
+      */}
 
       {featured ? (
         <section className="section">
@@ -214,14 +222,19 @@ export default function Home() {
 
       <EventsSection events={site.events || []} />
 
+      {/* Merch section hidden for now
       <MerchSection onOrder={(product) => setMerchProduct(product)} />
+      */}
 
+      {/* Direct support panel hidden for now
       <section className="section" id="support">
         <div className="container">
           <SupportPanel />
         </div>
       </section>
+      */}
 
+      {/* Supporter wall hidden for now
       <section className="section section--line">
         <div className="container">
           <div className="section-head">
@@ -236,6 +249,7 @@ export default function Home() {
           <Wall items={site.wall} limit={6} />
         </div>
       </section>
+      */}
 
       <section className="section section--line">
         <div className="container">
