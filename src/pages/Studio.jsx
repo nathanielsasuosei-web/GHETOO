@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import Icon from '../components/Icon';
 import { api } from '../lib/api';
 import { useToast } from '../context/ToastContext';
+import { useSite } from '../context/SiteContext';
 import Overview from '../studio/Overview';
 import Releases from '../studio/Releases';
 import VideoManager from '../studio/VideoManager';
@@ -93,6 +94,7 @@ export default function Studio() {
   const navigate = useNavigate();
   const tab = location.pathname.split('/')[2];
   const { toast } = useToast();
+  const { reload: reloadSite } = useSite();
   const [authed, setAuthed] = useState(null);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -112,13 +114,15 @@ export default function Studio() {
     try {
       const res = await api.overview();
       setData(res);
+      // Keep public pages in sync when returning from the studio without a full reload.
+      await reloadSite();
     } catch (err) {
       if (err.status === 401) setAuthed(false);
       else toast(err.message, 'error');
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, reloadSite]);
 
   useEffect(() => {
     checkAuth();

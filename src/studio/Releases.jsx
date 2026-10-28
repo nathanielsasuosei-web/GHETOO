@@ -1,5 +1,8 @@
 import { Fragment, useState } from 'react';
 import Icon from '../components/Icon';
+import StreamingFields from './StreamingFields';
+import { MUSIC_PLATFORMS, trackPlatformLinks } from '../lib/streaming';
+import { supportMinimum } from '../lib/support';
 import { api } from '../lib/api';
 import { cedis, compact, longDate } from '../lib/format';
 
@@ -10,7 +13,9 @@ const blank = {
   description: '',
   credits: '',
   lyrics: '',
-  minAmount: 5,
+  spotifyUrl: '',
+  appleMusicUrl: '',
+  youtubeUrl: '',
   published: true,
   allowStream: true,
   featured: false,
@@ -25,9 +30,11 @@ export default function Releases({ data, refresh, toast }) {
   const [progress, setProgress] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [editing, setEditing] = useState(null);
   const [lyricsEdit, setLyricsEdit] = useState(null);
   const [lyricsDraft, setLyricsDraft] = useState('');
+  const [linksEdit, setLinksEdit] = useState(null);
+  const [linksDraft, setLinksDraft] = useState({});
+  const [savingLinks, setSavingLinks] = useState(false);
 
   const reset = () => {
     setForm(blank);
@@ -54,22 +61,21 @@ export default function Releases({ data, refresh, toast }) {
   const submit = async (e) => {
     e.preventDefault();
     setError('');
-    if (!audio) {
-      setError('Choose an audio file for this release.');
+    if (!audio && !MUSIC_PLATFORMS.some(({ key }) => form[key].trim())) {
+      setError('Choose an audio file or add a streaming platform link.');
       return;
     }
     const payload = new FormData();
     Object.entries(form).forEach(([k, v]) => payload.append(k, String(v)));
     payload.append('duration', String(durationSeconds));
-    payload.append('minAmount', String(Math.round(Number(form.minAmount) * 100)));
-    payload.append('audio', audio);
+    if (audio) payload.append('audio', audio);
     if (cover) payload.append('cover', cover);
 
     setBusy(true);
     setProgress(0);
     try {
       await api.createTrack(payload, setProgress);
-      toast('Release published');
+      toast(form.published ? 'Release published' : 'Release saved as a draft');
       reset();
       setShowForm(false);
       await refresh();
@@ -89,17 +95,6 @@ export default function Releases({ data, refresh, toast }) {
     }
   };
 
-  const saveAmount = async (track, value) => {
-    try {
-      await api.updateTrack(track.id, { minAmount: Math.round(Number(value) * 100) });
-      setEditing(null);
-      await refresh();
-      toast('Minimum updated');
-    } catch (err) {
-      toast(err.message, 'error');
-    }
-  };
-
   const openLyrics = (track) => {
     setLyricsEdit(track.id);
     setLyricsDraft(track.lyrics || '');
@@ -113,6 +108,30 @@ export default function Releases({ data, refresh, toast }) {
       toast('Lyrics saved');
     } catch (err) {
       toast(err.message, 'error');
+    }
+  };
+
+  const openLinks = (track) => {
+    if (linksEdit === track.id) {
+      setLinksEdit(null);
+      return;
+    }
+    setLinksDraft(Object.fromEntries(MUSIC_PLATFORMS.map(({ key }) => [key, track[key] || ''])));
+    setLinksEdit(track.id);
+  };
+
+  const saveLinks = async (event, track) => {
+    event.preventDefault();
+    setSavingLinks(true);
+    try {
+      await api.updateTrack(track.id, linksDraft);
+      await refresh();
+      setLinksEdit(null);
+      toast('Streaming links saved');
+    } catch (err) {
+      toast(err.message, 'error');
+    } finally {
+      setSavingLinks(false);
     }
   };
 
@@ -146,13 +165,13 @@ export default function Releases({ data, refresh, toast }) {
         <div>
           <h1>Music</h1>
           <p>
-            {data.tracks.length} releases · {compact(data.stats.plays)} streams. Upload the master, set the minimum you
-            want for it, and it appears on the site instantly.
+            {data.tracks.length} releases · {compact(data.stats.plays)} on-site plays. Add streaming links to send
+            listeners to your released music on Spotify, Apple Music or YouTube.
           </p>
         </div>
         <button className="btn btn--gold" onClick={() => (setShowForm((v) => !v), reset())}>
           <Icon name={showForm ? 'close' : 'plus'} size={16} />
-          {showForm ? 'Cancel' : 'Upload release'}
+          {showForm ? 'Cancel' : 'Add release'}
         </button>
       </div>
 
@@ -161,7 +180,7 @@ export default function Releases({ data, refresh, toast }) {
           <div className="panel__head">
             <div>
               <h3>New release</h3>
-              <p>MP3, WAV, M4A, AAC, OGG or FLAC up to 800MB.</p>
+              <p>Add a platform link, an audio file, or both. Audio files can be MP3, WAV, M4A, AAC, OGG or FLAC up to 800MB.</p>
             </div>
           </div>
 
@@ -187,28 +206,14 @@ export default function Releases({ data, refresh, toast }) {
             </div>
           </div>
 
-          <div className="field-row">
-            <div className="field">
-              <label htmlFor="r-year">Year</label>
-              <input
-                id="r-year"
-                type="number"
-                value={form.year}
-                onChange={(e) => setForm({ ...form, year: e.target.value })}
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="r-min">Minimum support (GH₵)</label>
-              <input
-                id="r-min"
-                type="number"
-                min="0"
-                step="1"
-                value={form.minAmount}
-                onChange={(e) => setForm({ ...form, minAmount: e.target.value })}
-              />
-              <div className="field__hint">Fans can always pay more. Set 0 to allow free downloads.</div>
-            </div>
+          <div className="field" style={{ maxWidth: 260 }}>
+            <label htmlFor="r-year">Year</label>
+            <input
+              id="r-year"
+              type="number"
+              value={form.year}
+              onChange={(e) => setForm({ ...form, year: e.target.value })}
+            />
           </div>
 
           <div className="field">
@@ -243,18 +248,24 @@ export default function Releases({ data, refresh, toast }) {
             <div className="field__hint">Line breaks are kept. Section tags like [Chorus] show on the public lyrics view.</div>
           </div>
 
+          <StreamingFields
+            values={form}
+            onChange={(key, value) => setForm({ ...form, [key]: value })}
+            prefix="new-release"
+          />
+
           <div className="field-row">
             <label className="upload-drop">
               <input type="file" accept="audio/*" onChange={(e) => onAudio(e.target.files?.[0] || null)} />
               <Icon name="upload" size={20} style={{ margin: '0 auto 8px' }} />
-              <strong>{audio ? 'Audio ready' : 'Choose audio file *'}</strong>
+              <strong>{audio ? 'Audio ready' : 'Choose audio file'}</strong>
               {audio ? (
                 <span className="file-name">
                   {audio.name} · {(audio.size / 1024 / 1024).toFixed(1)}MB
                   {durationSeconds ? ` · ${Math.floor(durationSeconds / 60)}:${String(durationSeconds % 60).padStart(2, '0')}` : ''}
                 </span>
               ) : (
-                <span>MP3, WAV, M4A, FLAC — drag or click</span>
+                <span>Optional if a streaming link is provided; required for downloads.</span>
               )}
             </label>
 
@@ -281,8 +292,8 @@ export default function Releases({ data, refresh, toast }) {
             </div>
             <div className="toggle-row">
               <div>
-                <strong>Allow free streaming</strong>
-                <small>Fans can listen before they support.</small>
+                <strong>Allow on-site streaming</strong>
+                <small>Used only when an audio file is uploaded and no streaming links are set.</small>
               </div>
               <button
                 type="button"
@@ -336,7 +347,8 @@ export default function Releases({ data, refresh, toast }) {
         <div className="panel__head">
           <div>
             <h3>Catalogue</h3>
-            <p>Toggle what’s public, change the minimum, or delete.</p>
+            <p>Add streaming links and choose what’s public. All support starts at {cedis(supportMinimum(data.settings?.minSupport))}.</p>
+            <a className="studio-streaming-link" href="/studio/settings">Change the global minimum in Settings <Icon name="arrow" size={12} /></a>
           </div>
         </div>
         <div className="table-wrap">
@@ -344,9 +356,8 @@ export default function Releases({ data, refresh, toast }) {
             <thead>
               <tr>
                 <th>Release</th>
-                <th>Streams</th>
+                <th>Site plays</th>
                 <th>Downloads</th>
-                <th>Minimum</th>
                 <th>Status</th>
                 <th />
               </tr>
@@ -365,36 +376,20 @@ export default function Releases({ data, refresh, toast }) {
                         <div className="sub">
                           {track.genre} · {track.year} · added {longDate(track.createdAt)}
                         </div>
+                        <button
+                          type="button"
+                          className="studio-streaming-link"
+                          onClick={() => openLinks(track)}
+                          aria-expanded={linksEdit === track.id}
+                        >
+                          <Icon name="external" size={12} />
+                          {trackPlatformLinks(track).length ? 'Edit streaming links' : 'Add streaming links'}
+                        </button>
                       </div>
                     </div>
                   </td>
                   <td>{compact(track.plays)}</td>
                   <td>{compact(track.downloads)}</td>
-                  <td>
-                    {editing === track.id ? (
-                      <input
-                        type="number"
-                        min="0"
-                        step="1"
-                        autoFocus
-                        defaultValue={Math.round(track.minAmount / 100)}
-                        style={{
-                          width: 84,
-                          background: '#0a0b0c',
-                          border: '1px solid var(--gold)',
-                          borderRadius: 6,
-                          padding: '4px 8px',
-                          color: 'var(--ivory)',
-                        }}
-                        onBlur={(e) => saveAmount(track, e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && saveAmount(track, e.target.value)}
-                      />
-                    ) : (
-                      <button onClick={() => setEditing(track.id)} style={{ color: 'var(--ivory)' }}>
-                        {cedis(track.minAmount)} <Icon name="edit" size={11} style={{ display: 'inline', opacity: 0.5 }} />
-                      </button>
-                    )}
-                  </td>
                   <td>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                       <button
@@ -404,13 +399,17 @@ export default function Releases({ data, refresh, toast }) {
                       >
                         {track.published ? 'Live' : 'Draft'}
                       </button>
-                      <button
-                        className={`badge-status ${track.allowStream ? 'badge-status--live' : 'badge-status--cancelled'}`}
-                        onClick={() => toggle(track, 'allowStream')}
-                        title="Toggle free streaming"
-                      >
-                        {track.allowStream ? 'Stream' : 'Paid only'}
-                      </button>
+                      {track.audio ? (
+                        <button
+                          className={`badge-status ${track.allowStream ? 'badge-status--live' : 'badge-status--cancelled'}`}
+                          onClick={() => toggle(track, 'allowStream')}
+                          title="Toggle on-site streaming"
+                        >
+                          {track.allowStream ? 'Site stream' : 'Site stream off'}
+                        </button>
+                      ) : (
+                        <span className="badge-status badge-status--draft">Platform only</span>
+                      )}
                     </div>
                   </td>
                   <td>
@@ -445,18 +444,44 @@ export default function Releases({ data, refresh, toast }) {
                           e.target.value = '';
                         }}
                       />
-                      <a className="icon-btn icon-btn--sm" href={`/api/stream/${track.id}`} target="_blank" rel="noreferrer" title="Preview audio">
-                        <Icon name="play" size={14} />
-                      </a>
+                      {track.audio && track.allowStream ? (
+                        <a className="icon-btn icon-btn--sm" href={`/api/stream/${track.id}`} target="_blank" rel="noreferrer" title="Preview audio">
+                          <Icon name="play" size={14} />
+                        </a>
+                      ) : null}
                       <button className="icon-btn icon-btn--sm" onClick={() => remove(track)} title="Delete release">
                         <Icon name="trash" size={14} />
                       </button>
                     </div>
                   </td>
                 </tr>
+                {linksEdit === track.id ? (
+                  <tr>
+                    <td colSpan={5}>
+                      <form className="lyrics-editor" onSubmit={(event) => saveLinks(event, track)}>
+                        <div className="lyrics-editor__head">
+                          <strong><Icon name="external" size={13} /> Streaming links — {track.title}</strong>
+                        </div>
+                        <StreamingFields
+                          values={linksDraft}
+                          onChange={(key, value) => setLinksDraft({ ...linksDraft, [key]: value })}
+                          prefix={`edit-${track.id}`}
+                        />
+                        <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
+                          <button className="btn btn--gold btn--sm" disabled={savingLinks}>
+                            <Icon name="check" size={13} /> {savingLinks ? 'Saving…' : 'Save links'}
+                          </button>
+                          <button type="button" className="btn btn--ghost btn--sm" onClick={() => setLinksEdit(null)}>
+                            Cancel
+                          </button>
+                        </div>
+                      </form>
+                    </td>
+                  </tr>
+                ) : null}
                 {lyricsEdit === track.id ? (
                   <tr>
-                    <td colSpan={6}>
+                    <td colSpan={5}>
                       <div className="lyrics-editor">
                         <div className="lyrics-editor__head">
                           <strong>

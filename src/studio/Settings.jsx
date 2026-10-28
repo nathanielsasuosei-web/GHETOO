@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import Icon from '../components/Icon';
 import { api } from '../lib/api';
+import { MIN_SUPPORT_PESEWAS, MAX_SUPPORT_PESEWAS, supportMinimum } from '../lib/support';
 
 const NETWORKS = [
   { id: 'mtn', label: 'MTN MoMo' },
@@ -18,6 +19,7 @@ export default function Settings({ data, refresh, toast }) {
     city: s.city || '',
     announcement: s.announcement || '',
     supportNote: s.supportNote || '',
+    minSupport: supportMinimum(s.minSupport) / 100,
     goalAmount: Math.round((s.goalAmount || 0) / 100),
     showRaised: s.showRaised !== false,
     contactEmail: s.contactEmail || '',
@@ -48,6 +50,7 @@ export default function Settings({ data, refresh, toast }) {
         city: form.city,
         announcement: form.announcement,
         supportNote: form.supportNote,
+        minSupport: Math.round(Number(form.minSupport) * 100),
         goalAmount: Math.round(Number(form.goalAmount) * 100),
         showRaised: form.showRaised,
         contactEmail: form.contactEmail,
@@ -188,6 +191,23 @@ export default function Settings({ data, refresh, toast }) {
                 value={form.contactEmail}
                 onChange={(e) => setForm({ ...form, contactEmail: e.target.value })}
               />
+            </div>
+          </div>
+          <div className="field">
+            <label htmlFor="s-min-support">Minimum support for all art (GH₵)</label>
+            <input
+              id="s-min-support"
+              type="number"
+              min={MIN_SUPPORT_PESEWAS / 100}
+              max={MAX_SUPPORT_PESEWAS / 100}
+              step="0.01"
+              required
+              value={form.minSupport}
+              onChange={(e) => setForm({ ...form, minSupport: e.target.value })}
+            />
+            <div className="field__hint">
+              One minimum for general support, songs and videos. Fans can give more. Streaming-platform royalties
+              and merch prices are separate.
             </div>
           </div>
           <div className="field">

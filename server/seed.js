@@ -28,7 +28,8 @@ Today his sound sits somewhere between Afrobeats and alté — Twi and Pidgin la
     },
     cardEnabled: true,
     supportNote:
-      'Every cedi goes straight into studio time, mixing, videos and getting the music to more ears. Pay what you can — even GHS 1 keeps the lights on.',
+      'Every cedi goes straight into studio time, mixing, videos and getting the music to more ears. Your support keeps the lights on.',
+    minSupport: 100,
     socials: {
       instagram: 'https://instagram.com',
       tiktok: 'https://tiktok.com',

@@ -5,6 +5,7 @@ import { useSite } from '../context/SiteContext';
 import { useSupport } from '../context/SupportContext';
 import { api } from '../lib/api';
 import { cedis } from '../lib/format';
+import { MAX_SUPPORT_PESEWAS, supportMinimum, supportPresets } from '../lib/support';
 
 const NETWORKS = [
   { id: 'mtn', label: 'MTN MoMo', color: '#FFCC00' },
@@ -39,12 +40,14 @@ function CopyRow({ label, value }) {
 }
 
 export default function SupportModal() {
-  const { open, track: presetTrack, amount: presetAmount, closeSupport } = useSupport();
+  const { open, track: presetTrack, video: presetVideo, amount: presetAmount, closeSupport } = useSupport();
   const { site } = useSite();
   const tracks = site?.tracks || [];
+  const videos = site?.videos || [];
   const [step, setStep] = useState('form');
   const [trackId, setTrackId] = useState('');
-  const [amount, setAmount] = useState(2000);
+  const [videoId, setVideoId] = useState('');
+  const [amountInput, setAmountInput] = useState('1');
   const [method, setMethod] = useState('momo');
   const [provider, setProvider] = useState('mtn');
   const [name, setName] = useState('');
@@ -61,7 +64,11 @@ export default function SupportModal() {
     () => tracks.find((t) => t.id === trackId) || null,
     [tracks, trackId]
   );
-  const floor = Math.max(site?.minSupport || 100, selectedTrack?.minAmount || 0);
+  const selectedVideo = useMemo(
+    () => videos.find((v) => v.id === videoId) || null,
+    [videos, videoId]
+  );
+  const floor = supportMinimum(site?.minSupport);
 
   useEffect(() => {
     if (!open) return;
@@ -71,8 +78,9 @@ export default function SupportModal() {
     setMomo(null);
     setBusy(false);
     setTrackId(presetTrack?.id || '');
-    const base = Math.max(floor, presetAmount || selectedTrack?.minAmount || 2000);
-    setAmount(presetTrack || presetAmount ? Math.max(100, presetAmount || base) : 2000);
+    setVideoId(presetVideo?.id || '');
+    const requested = Number.isSafeInteger(presetAmount) ? presetAmount : floor;
+    setAmountInput(String(Math.min(MAX_SUPPORT_PESEWAS, Math.max(floor, requested)) / 100));
     setMessage('');
     document.body.style.overflow = 'hidden';
     const onKey = (e) => e.key === 'Escape' && closeSupport();
@@ -81,14 +89,7 @@ export default function SupportModal() {
       document.body.style.overflow = '';
       window.removeEventListener('keydown', onKey);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, presetTrack?.id, presetAmount]);
-
-  useEffect(() => {
-    if (!selectedTrack) return;
-    if (amount < selectedTrack.minAmount) setAmount(selectedTrack.minAmount);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trackId]);
+  }, [open, presetTrack?.id, presetVideo?.id, presetAmount, floor, closeSupport]);
 
   // poll while waiting for a manual MoMo confirmation
   useEffect(() => {
@@ -115,14 +116,19 @@ export default function SupportModal() {
 
   if (!open || !site) return null;
 
-  const presets = [1, 2, 5, 10].map((mult) => Math.max(floor, floor * mult));
-  const amountCedis = Number.isFinite(amount) ? Math.round(amount) / 100 : '';
+  const presets = supportPresets(floor);
+  const numericAmount = Number(amountInput);
+  const amount = amountInput.trim() && Number.isFinite(numericAmount) ? Math.round(numericAmount * 100) : NaN;
 
   const submit = async (event) => {
     event.preventDefault();
     setError('');
-    if (!amount || amount < floor) {
-      setError(`The minimum for this is ${cedis(floor)}.`);
+    if (!Number.isSafeInteger(amount) || Math.abs(numericAmount * 100 - amount) > 0.000001 || amount < floor) {
+      setError(`Enter an amount of at least ${cedis(floor)}, with up to two decimal places.`);
+      return;
+    }
+    if (amount > MAX_SUPPORT_PESEWAS) {
+      setError(`The maximum for one payment is ${cedis(MAX_SUPPORT_PESEWAS)}.`);
       return;
     }
     if (!anonymous && name.trim().length < 2) {
@@ -137,6 +143,7 @@ export default function SupportModal() {
     try {
       const result = await api.createOrder({
         trackId: selectedTrack?.id || null,
+        videoId: selectedVideo?.id || null,
         amount,
         method,
         provider,
@@ -169,8 +176,8 @@ export default function SupportModal() {
             <div className="modal__head">
               <div>
                 <span className="eyebrow">Support the artist</span>
-                <h3>{selectedTrack ? 'Buy this record' : 'Fund the next release'}</h3>
-                <p>Pay what you can. Direct to the artist — no label in between.</p>
+                <h3>{selectedVideo ? 'Support this video' : selectedTrack ? (selectedTrack.hasDownload ? 'Buy this record' : 'Support this release') : 'Fund the next release'}</h3>
+                <p>Support from {cedis(floor)}. You can choose to give more.</p>
               </div>
               <button type="button" className="modal__close" onClick={closeSupport} aria-label="Close">
                 <Icon name="close" size={16} />
@@ -178,39 +185,61 @@ export default function SupportModal() {
             </div>
 
             <div className="modal__body">
-              {selectedTrack ? (
+              {selectedTrack || selectedVideo ? (
                 <div className="support-mini">
-                  <img src={selectedTrack.cover} alt="" />
+                  <img src={selectedTrack?.cover || selectedVideo?.thumb} alt="" />
                   <div>
-                    <h4>{selectedTrack.title}</h4>
+                    <h4>{selectedTrack?.title || selectedVideo?.title}</h4>
                     <p>
-                      {selectedTrack.genre} · {selectedTrack.year} · from {cedis(selectedTrack.minAmount)}
+                      {selectedTrack ? `${selectedTrack.genre} · ${selectedTrack.year}` : 'Video'} · from {cedis(floor)}
                     </p>
+                    {selectedVideo || !selectedTrack.hasDownload ? <p>Support only — no download is included.</p> : null}
                   </div>
+                  <button
+                    type="button"
+                    className="support-mini__change"
+                    onClick={() => { setTrackId(''); setVideoId(''); }}
+                    aria-label="Choose different art to support"
+                  >
+                    Change
+                  </button>
                 </div>
               ) : (
                 <div className="field">
                   <label htmlFor="support-track">What are you supporting?</label>
-                  <select id="support-track" value={trackId} onChange={(e) => setTrackId(e.target.value)}>
+                  <select
+                    id="support-track"
+                    value=""
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setTrackId(value.startsWith('track:') ? value.slice(6) : '');
+                      setVideoId(value.startsWith('video:') ? value.slice(6) : '');
+                    }}
+                  >
                     <option value="">General support — studio, videos, the next drop</option>
-                    {tracks.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.title} (from {cedis(t.minAmount)})
-                      </option>
-                    ))}
+                    {tracks.length ? (
+                      <optgroup label="Songs">
+                        {tracks.map((t) => <option key={t.id} value={`track:${t.id}`}>{t.title}</option>)}
+                      </optgroup>
+                    ) : null}
+                    {videos.length ? (
+                      <optgroup label="Videos">
+                        {videos.map((v) => <option key={v.id} value={`video:${v.id}`}>{v.title}</option>)}
+                      </optgroup>
+                    ) : null}
                   </select>
                 </div>
               )}
 
               <div className="amounts">
-                {presets.map((value, i) => (
+                {presets.map((value) => (
                   <button
                     type="button"
                     key={value}
                     className={amount === value ? 'is-active' : ''}
-                    onClick={() => setAmount(value)}
+                    onClick={() => setAmountInput(String(value / 100))}
                   >
-                    {i === 0 ? cedis(value, { withSymbol: false }) : cedis(value, { withSymbol: false })}
+                    {cedis(value, { withSymbol: false })}
                   </button>
                 ))}
               </div>
@@ -222,17 +251,15 @@ export default function SupportModal() {
                   id="support-amount"
                   type="number"
                   min={floor / 100}
-                  step="1"
-                  value={amountCedis}
-                  onChange={(e) => {
-                    const next = Math.round(Number(e.target.value) * 100);
-                    setAmount(Number.isFinite(next) ? Math.max(0, next) : 0);
-                  }}
+                  max={MAX_SUPPORT_PESEWAS / 100}
+                  step="0.01"
+                  value={amountInput}
+                  onChange={(e) => setAmountInput(e.target.value)}
                   inputMode="decimal"
                   required
                 />
                 <div className="field__hint">
-                  Minimum {cedis(floor)} {selectedTrack ? 'for this record' : 'to keep the lights on'} · no maximum.
+                  Artist-set minimum {cedis(floor)} · maximum per payment {cedis(MAX_SUPPORT_PESEWAS)}.
                 </div>
               </div>
 

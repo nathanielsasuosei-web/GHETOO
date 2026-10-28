@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib/api';
+import { canPlayOnSite } from '../lib/streaming';
 
 const PlayerContext = createContext(null);
 
@@ -98,8 +99,8 @@ export function PlayerProvider({ children }) {
   const play = useCallback(
     (track, list) => {
       const audio = audioRef.current;
-      if (!audio || !track) return;
-      if (list) setQueue(list);
+      if (!audio || !canPlayOnSite(track)) return;
+      if (list) setQueue(list.filter(canPlayOnSite));
       if (currentRef.current?.id === track.id) {
         if (audio.paused) audio.play().catch(() => {});
         else audio.pause();

@@ -1,13 +1,12 @@
 import { Link } from 'react-router-dom';
 import Icon from '../components/Icon';
+import TrackListen from '../components/TrackListen';
 import useReveal from '../hooks/useReveal';
 import { useSite } from '../context/SiteContext';
-import { usePlayer } from '../context/PlayerContext';
 import { cedis } from '../lib/format';
 
 export default function About() {
   const { site } = useSite();
-  const { play } = usePlayer();
   const settings = site.settings;
   const featured = site.tracks.find((t) => t.featured) || site.tracks[0];
   useReveal(site);
@@ -76,25 +75,24 @@ export default function About() {
                   <em>No gatekeepers.</em>
                 </h2>
                 <p className="support-panel__text">
-                  Streaming pays fractions of a cedi. So the music lives here: free to hear, and available to buy at
-                  whatever price you decide. When you support a record, the money is the difference between recording
-                  next month or not recording at all.
+                  Listen on your favourite streaming platforms or hear available releases here. Direct support helps
+                  fund studio time, videos and the next record — and some releases include a download to keep.
                 </p>
               </div>
               <div className="support-panel__box">
                 <div className="toggle-row">
                   <div>
                     <strong>Streams</strong>
-                    <small>Unlimited, no account needed</small>
+                    <small>Available on streaming platforms or on this site</small>
                   </div>
-                  <span className="badge-status badge-status--paid">Free</span>
+                  <span className="badge-status badge-status--paid">Listen</span>
                 </div>
                 <div className="toggle-row">
                   <div>
                     <strong>Downloads</strong>
-                    <small>Yours to keep after you support</small>
+                    <small>Available with support for select releases</small>
                   </div>
-                  <span className="badge-status badge-status--pending">Pay what you want</span>
+                  <span className="badge-status badge-status--pending">Select releases</span>
                 </div>
                 <div className="toggle-row">
                   <div>
@@ -105,10 +103,14 @@ export default function About() {
                 </div>
                 <div style={{ display: 'grid', gap: 10, marginTop: 20 }}>
                   {featured ? (
-                    <button className="btn btn--gold btn--block" onClick={() => play(featured, site.tracks)}>
-                      <Icon name="play" size={15} />
-                      Listen to “{featured.title}”
-                    </button>
+                    <TrackListen track={featured} list={site.tracks} className="btn btn--gold btn--block">
+                      {({ link, playing }) => (
+                        <>
+                          <Icon name={link ? 'external' : playing ? 'pause' : 'play'} size={15} />
+                          {link ? `Listen on ${link.label}` : playing ? 'Pause' : `Listen to “${featured.title}”`}
+                        </>
+                      )}
+                    </TrackListen>
                   ) : null}
                   <Link to="/support" className="btn btn--ghost btn--block">
                     Support the next release

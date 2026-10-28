@@ -104,7 +104,7 @@ export default function ThankYou() {
                   {order.trackTitle ? ` for “${order.trackTitle}”` : ''}. Your name is on the wall
                   {order.supporterName === 'Anonymous supporter' ? ' (privately)' : ''}.
                 </p>
-                {order.trackId ? (
+                {order.downloadToken ? (
                   <div className="thanks__download">
                     <img
                       src={site?.tracks.find((t) => t.id === order.trackId)?.cover || '/media/covers/placeholder.jpg'}

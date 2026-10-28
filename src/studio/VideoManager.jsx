@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import Icon from '../components/Icon';
+import { videoYouTubeUrl } from '../lib/streaming';
 import { api } from '../lib/api';
 import { compact, longDate } from '../lib/format';
 
-const blank = { title: '', description: '', source: 'file', url: '', featured: false, published: true };
+const blank = { title: '', description: '', source: 'file', url: '', youtubeUrl: '', featured: false, published: true };
 
 export default function VideoManager({ data, refresh, toast }) {
   const [showForm, setShowForm] = useState(false);
@@ -13,6 +14,9 @@ export default function VideoManager({ data, refresh, toast }) {
   const [progress, setProgress] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [youtubeEdit, setYoutubeEdit] = useState(null);
+  const [youtubeDraft, setYoutubeDraft] = useState('');
+  const [savingLink, setSavingLink] = useState(false);
 
   const reset = () => {
     setForm(blank);
@@ -35,8 +39,9 @@ export default function VideoManager({ data, refresh, toast }) {
     payload.append('source', form.source);
     payload.append('published', String(form.published));
     payload.append('featured', String(form.featured));
+    payload.append('youtubeUrl', form.youtubeUrl);
     if (form.source === 'url') payload.append('url', form.url);
-    if (video) payload.append('video', video);
+    if (form.source === 'file' && video) payload.append('video', video);
     if (thumb) payload.append('thumb', thumb);
 
     setBusy(true);
@@ -51,6 +56,30 @@ export default function VideoManager({ data, refresh, toast }) {
       setError(err.message);
     } finally {
       setBusy(false);
+    }
+  };
+
+  const openYouTubeLink = (item) => {
+    if (youtubeEdit === item.id) {
+      setYoutubeEdit(null);
+      return;
+    }
+    setYoutubeDraft(item.youtubeUrl || '');
+    setYoutubeEdit(item.id);
+  };
+
+  const saveYouTubeLink = async (event, item) => {
+    event.preventDefault();
+    setSavingLink(true);
+    try {
+      await api.updateVideo(item.id, { youtubeUrl: youtubeDraft });
+      await refresh();
+      setYoutubeEdit(null);
+      toast('YouTube link saved');
+    } catch (err) {
+      toast(err.message, 'error');
+    } finally {
+      setSavingLink(false);
     }
   };
 
@@ -80,8 +109,8 @@ export default function VideoManager({ data, refresh, toast }) {
         <div>
           <h1>Videos</h1>
           <p>
-            {data.videos.length} visuals · {compact(data.stats.views)} views. Upload an MP4 or point to a YouTube/Vimeo
-            link.
+            {data.videos.length} visuals · {compact(data.stats.views)} on-site opens. Add a YouTube link to send
+            viewers to your channel instead of the uploaded video.
           </p>
         </div>
         <button className="btn btn--gold" onClick={() => (setShowForm((v) => !v), reset())}>
@@ -160,11 +189,29 @@ export default function VideoManager({ data, refresh, toast }) {
                 type="url"
                 value={form.url}
                 onChange={(e) => setForm({ ...form, url: e.target.value })}
-                placeholder="https://www.youtube.com/embed/…"
+                placeholder="https://www.youtube.com/watch?v=…"
               />
-              <div className="field__hint">Use an embed URL for YouTube (…/embed/ID) so it plays inside the site.</div>
+              <div className="field__hint">YouTube watch, short and embed links open on YouTube. Other hosted links should use an embed URL.</div>
             </div>
           )}
+
+          <div className="streaming-fields">
+            <div className="field">
+              <label htmlFor="v-youtube">YouTube watch link (optional)</label>
+              <input
+                id="v-youtube"
+                type="url"
+                maxLength={2048}
+                value={form.youtubeUrl}
+                onChange={(e) => setForm({ ...form, youtubeUrl: e.target.value })}
+                placeholder="https://www.youtube.com/watch?v=…"
+              />
+              <div className="field__hint">
+                For uploaded videos, this directs viewers to your YouTube video. If the source above is already a YouTube link,
+                leave this blank. Monetization depends on your channel and YouTube’s rules.
+              </div>
+            </div>
+          </div>
 
           <label className="upload-drop" style={{ marginTop: 14 }}>
             <input type="file" accept="image/*" onChange={(e) => setThumb(e.target.files?.[0] || null)} />
@@ -239,7 +286,7 @@ export default function VideoManager({ data, refresh, toast }) {
             <thead>
               <tr>
                 <th>Video</th>
-                <th>Views</th>
+                <th>Site opens</th>
                 <th>Source</th>
                 <th>Status</th>
                 <th />
@@ -247,7 +294,8 @@ export default function VideoManager({ data, refresh, toast }) {
             </thead>
             <tbody>
               {data.videos.map((item) => (
-                <tr key={item.id}>
+                <Fragment key={item.id}>
+                <tr>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                       <img
@@ -266,6 +314,15 @@ export default function VideoManager({ data, refresh, toast }) {
                           ) : null}
                         </strong>
                         <div className="sub">added {longDate(item.createdAt)}</div>
+                        <button
+                          type="button"
+                          className="studio-streaming-link"
+                          onClick={() => openYouTubeLink(item)}
+                          aria-expanded={youtubeEdit === item.id}
+                        >
+                          <Icon name="youtube" size={13} />
+                          {videoYouTubeUrl(item) ? 'Edit YouTube link' : 'Add YouTube link'}
+                        </button>
                       </div>
                     </div>
                   </td>
@@ -295,6 +352,41 @@ export default function VideoManager({ data, refresh, toast }) {
                     </div>
                   </td>
                 </tr>
+                {youtubeEdit === item.id ? (
+                  <tr>
+                    <td colSpan={5}>
+                      <form className="lyrics-editor" onSubmit={(event) => saveYouTubeLink(event, item)}>
+                        <div className="lyrics-editor__head">
+                          <strong><Icon name="youtube" size={14} /> YouTube — {item.title}</strong>
+                        </div>
+                        <div className="field">
+                          <label htmlFor={`youtube-${item.id}`}>YouTube watch link</label>
+                          <input
+                            id={`youtube-${item.id}`}
+                            type="url"
+                            maxLength={2048}
+                            value={youtubeDraft}
+                            onChange={(event) => setYoutubeDraft(event.target.value)}
+                            placeholder="https://www.youtube.com/watch?v=…"
+                          />
+                          <div className="field__hint">
+                            This link takes priority over the source video. If the source itself is YouTube, it is used
+                            when this field is empty. YouTube monetization and payouts depend on channel eligibility.
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 10 }}>
+                          <button className="btn btn--gold btn--sm" disabled={savingLink}>
+                            <Icon name="check" size={13} /> {savingLink ? 'Saving…' : 'Save link'}
+                          </button>
+                          <button type="button" className="btn btn--ghost btn--sm" onClick={() => setYoutubeEdit(null)}>
+                            Cancel
+                          </button>
+                        </div>
+                      </form>
+                    </td>
+                  </tr>
+                ) : null}
+                </Fragment>
               ))}
             </tbody>
           </table>

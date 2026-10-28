@@ -3,11 +3,13 @@ import TrackRow from '../components/TrackRow';
 import useReveal from '../hooks/useReveal';
 import { useSite } from '../context/SiteContext';
 import { usePlayer } from '../context/PlayerContext';
+import { canPlayOnSite } from '../lib/streaming';
 
 export default function Music() {
   const { site } = useSite();
   const { play } = usePlayer();
   const tracks = site.tracks;
+  const onSiteTracks = tracks.filter(canPlayOnSite);
   useReveal(tracks);
 
   return (
@@ -17,24 +19,22 @@ export default function Music() {
           <span className="eyebrow">Discography</span>
           <h1>Music</h1>
           <p>
-            Every release, free to stream. If a song means something to you, you can buy it for whatever you think
-            it’s worth — the download is yours to keep.
+            Listen on your favourite streaming platforms or play available releases here. You can also support the
+            music directly; select releases include a download to keep.
           </p>
         </div>
       </section>
 
       <section className="section section--tight">
         <div className="container">
-          <div className="section-head" style={{ marginBottom: 24, justifyContent: 'flex-end' }}>
-            <button
-              className="btn btn--ghost btn--sm"
-              onClick={() => play(tracks[0], tracks)}
-              disabled={!tracks.length}
-            >
-              <Icon name="play" size={13} />
-              Play all
-            </button>
-          </div>
+          {onSiteTracks.length ? (
+            <div className="section-head" style={{ marginBottom: 24, justifyContent: 'flex-end' }}>
+              <button className="btn btn--ghost btn--sm" onClick={() => play(onSiteTracks[0], onSiteTracks)}>
+                <Icon name="play" size={13} />
+                {onSiteTracks.length === tracks.length ? 'Play all' : 'Play on-site releases'}
+              </button>
+            </div>
+          ) : null}
 
           {tracks.length ? (
             <div className="tracklist">
@@ -49,8 +49,8 @@ export default function Music() {
           <div className="alert alert--info" style={{ marginTop: 30 }}>
             <Icon name="download" size={16} />
             <span>
-              Supporting a track unlocks a high-quality download of that record. Supporters’ names and messages appear
-              on the wall — unless you choose to stay anonymous.
+              Support the music directly. Releases with an uploaded audio file include a download; supporters’ names
+              and messages appear on the wall unless you choose to stay anonymous.
             </span>
           </div>
         </div>
