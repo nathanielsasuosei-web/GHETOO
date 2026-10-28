@@ -882,6 +882,7 @@ ul {
   border-radius: 10px;
 }
 .track:hover .track__artbtn,
+.track__artbtn:focus-visible,
 .track.is-playing .track__artbtn {
   opacity: 1;
 }
@@ -900,6 +901,25 @@ ul {
   font-size: 12px;
   color: var(--muted);
   margin-top: 3px;
+}
+.track__platforms {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px 10px;
+  margin-top: 9px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.track__platforms a {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--gold-soft);
+  font-weight: 600;
+}
+.track__platforms a:hover {
+  text-decoration: underline;
 }
 .track__stat {
   font-size: 12px;
@@ -988,9 +1008,35 @@ ul {
   grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
   gap: 26px;
 }
+.video-item {
+  min-width: 0;
+}
+.video-card__support {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 12px 4px 0;
+  padding: 8px 12px;
+  border: 1px solid rgba(232, 163, 61, 0.32);
+  border-radius: 999px;
+  color: var(--gold-soft);
+  font-size: 12px;
+  font-weight: 600;
+}
+.video-card__support:hover {
+  border-color: var(--gold);
+  background: rgba(232, 163, 61, 0.1);
+}
 .video-card {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  text-align: left;
   cursor: pointer;
-  group: video;
+}
+.video-card__platform {
+  color: var(--gold-soft);
+  font-weight: 600;
 }
 .video-card__thumb {
   position: relative;
@@ -1725,6 +1771,16 @@ ul {
   border-radius: 9px;
   object-fit: cover;
 }
+.support-mini__change {
+  margin-left: auto;
+  flex-shrink: 0;
+  color: var(--gold-soft);
+  font-size: 12px;
+  font-weight: 600;
+}
+.support-mini__change:hover {
+  color: var(--gold);
+}
 .support-mini h4 {
   font-size: 14.5px;
   font-weight: 600;
@@ -2455,6 +2511,37 @@ ul {
   margin-top: 6px;
   display: block;
   word-break: break-all;
+}
+
+.streaming-fields {
+  padding: 18px;
+  margin: 18px 0;
+  background: rgba(232, 163, 61, 0.04);
+  border: 1px solid rgba(232, 163, 61, 0.2);
+  border-radius: 14px;
+}
+.streaming-fields > strong {
+  color: var(--gold-soft);
+  font-size: 13px;
+}
+.streaming-fields > .field__hint {
+  margin: 6px 0 16px;
+  line-height: 1.6;
+}
+.streaming-fields .field:last-child {
+  margin-bottom: 0;
+}
+.studio-streaming-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 7px;
+  color: var(--gold-soft);
+  font-size: 11px;
+  font-weight: 600;
+}
+.studio-streaming-link:hover {
+  text-decoration: underline;
 }
 
 /* -------------------------------------------------------------- website tab */

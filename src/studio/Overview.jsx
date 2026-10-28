@@ -24,6 +24,15 @@ export default function Overview({ data }) {
         </div>
       </div>
 
+      <div className="alert alert--info" style={{ marginBottom: 24 }}>
+        <Icon name="headphone" size={16} />
+        <span>
+          Add your released music links in Music and YouTube links in Videos. Platform streams and royalties are
+          reported by your distributor or YouTube, not here; on-site plays do not earn platform royalties. Demo data
+          and sandbox payments are not real earnings.
+        </span>
+      </div>
+
       <div className="stat-grid">
         <div className="stat-card stat-card--gold">
           <span>
@@ -48,7 +57,7 @@ export default function Overview({ data }) {
         </div>
         <div className="stat-card">
           <span>
-            <Icon name="headphone" size={12} /> Streams
+            <Icon name="headphone" size={12} /> On-site plays
           </span>
           <strong>{compact(stats.plays)}</strong>
           <em>{compact(stats.downloads)} downloads</em>
@@ -198,7 +207,7 @@ export default function Overview({ data }) {
         <div className="panel__head">
           <div>
             <h3>Most played</h3>
-            <p>Streams across all releases.</p>
+            <p>On-site plays only. Check your distributor for platform streams and royalties.</p>
           </div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 14 }}>

@@ -1,9 +1,10 @@
 # Young Silence — official streaming & support site
 
-A self-contained platform for Ghanaian artist **Young Silence**: fans stream the music and
-videos for free, and support the art by paying **any amount they choose** — Mobile Money
-(MTN / Telecel / AirtelTigo) or card. Everything the artist uploads appears on the site
-immediately, and every support payment lands in one dashboard.
+A self-contained platform for Ghanaian artist **Young Silence**: fans can listen on linked
+streaming platforms or play available releases on the site, and support the art from an
+**artist-set minimum** — Mobile Money (MTN / Telecel / AirtelTigo) or card. Fans may give
+more. Direct support payments appear in the studio; streaming-platform royalties are reported
+separately.
 
 No third-party CMS, no label, no gatekeepers. One Node process + a JSON file.
 
@@ -15,9 +16,10 @@ No third-party CMS, no label, no gatekeepers. One Node process + a JSON file.
 
 - Cinematic home page: hero, featured release, catalogue, videos, upcoming shows, merch,
   supporter wall, bio
-- `/music` — full catalogue with genre filters, streaming player, "support from GH₵ X"
-  and per-track **lyrics** in a pop-up viewer
-- `/videos` — uploaded MP4s or YouTube/Vimeo links in a lightbox player
+- `/music` — full catalogue with links to Spotify, Apple Music and YouTube when configured,
+  on-site playback as a fallback, direct support and per-track **lyrics**
+- `/videos` — YouTube watch links when configured, with uploaded MP4s or other hosted videos
+  available in a lightbox as a fallback
 - `/events` — tour dates split into upcoming and past shows, with venue, city, price note
   and external ticket links; upcoming shows also preview on the home page
 - `/merch` — product store with photos, sizes and per-unit prices; checkout reuses the
@@ -32,9 +34,10 @@ No third-party CMS, no label, no gatekeepers. One Node process + a JSON file.
 **Artist studio (`/studio`)**
 
 - Password-protected dashboard (default `youngsilence` — change it!)
-- Upload releases (MP3/WAV/M4A/FLAC + cover art) with per-release minimum price,
-  draft/live toggle, free-streaming toggle, homepage spotlight and **lyrics editor**
-- Upload videos or paste a hosted link, with thumbnails and drafts
+- Add releases with streaming-platform links and/or audio (MP3/WAV/M4A/FLAC + cover art),
+  draft/live toggle, on-site streaming toggle, homepage spotlight and **lyrics editor**
+- Set one minimum for direct support of songs, videos and the artist in **Settings**
+- Upload videos or paste a hosted link, with thumbnails, drafts and editable YouTube watch links
 - **Events tab** — add shows with date/time, venue, city, price note, ticket link and
   draft/live toggle; past shows are archived automatically
 - **Merch tab** — products with photo upload, sizes, price and drafts, plus a separate
@@ -83,6 +86,15 @@ Copy `.env.example` to `.env` (or set the variables in your host) and restart:
 
 ### How payments work
 
+Set **Studio → Settings → Minimum support for all art** to an amount from GH₵1 to GH₵50,000.
+This one minimum applies to general support, songs and videos; fans can choose to give more.
+Video cards have a direct-support button. Merchandise prices and royalties from Spotify,
+Apple Music or YouTube are separate and are not affected by this setting.
+
+New sites start at GH₵1. For existing databases, the initial global minimum is migrated to
+the highest previous per-release minimum, subject to the GH₵50,000 checkout limit, so valid
+existing minimums do not silently decrease. The artist can then change the amount in Settings.
+
 **Mobile Money** — the way most independent Ghanaian artists actually get paid. The fan
 picks a network, gets the artist's number and a unique reference (`YS-XXXXXX`), sends the
 money themselves, and the support sits as *awaiting confirmation* until the artist marks it
@@ -95,6 +107,28 @@ confirmed via the callback **and** a signature-verified webhook
 labelled "sandbox" so the whole flow can be tested.
 
 Set the payout numbers in **Studio → Settings → Payout numbers**.
+
+### Streaming platforms and royalties
+
+1. Release your music through a distributor to services such as Spotify or Apple Music, and
+   upload videos to your own YouTube channel. Make sure you have the necessary rights and
+   meet each service's monetization and payout requirements.
+2. In **Studio → Music**, add a release or select **Add/Edit streaming links** on an existing
+   one. Paste the official song or album URLs. An audio upload is optional when a platform
+   link is provided; upload audio if you also want to offer a supporter download.
+3. In **Studio → Videos**, paste a YouTube video URL as the source or add a YouTube watch link
+   to an existing uploaded video. Viewers are sent to YouTube when that link is set. Other
+   sources and uploads continue to play on the site when there is no YouTube link.
+4. Check your distributor's and YouTube's own dashboards for verified streams, earnings,
+   eligibility and payouts. The site's counters cover on-site playback or video opens only;
+   they do not count platform streams or calculate royalties. On-site playback does not itself
+   generate Spotify/YouTube royalties, and not every platform play necessarily earns money.
+   Demo data and sandbox payments are not real earnings.
+
+For music, all configured service links are shown to listeners; primary play buttons use the
+first configured service (Spotify, then Apple Music, then YouTube). On-site playback is only
+offered for tracks without platform links and an enabled audio file. Platform-only releases
+can still receive voluntary support, but do not offer a download unless audio is uploaded.
 
 ### Changing the homepage hero
 
@@ -156,7 +190,8 @@ both share the same `YS-XXXXXX` references and MoMo/card confirmation flow.
 
 Any Node host works (Render, Railway, Fly, a VPS). Build, then run `node server/index.js`
 behind HTTPS — required for card payments and for a professional look. Make sure
-`DATA_DIR` is on persistent storage, otherwise uploads and orders are lost on redeploy.
+`DATA_DIR` is on persistent storage, otherwise settings (including support minimums and
+streaming links), uploads and orders can be lost on restart or redeploy.
 Point Paystack's webhook at `https://your-domain/api/payments/webhook`.
 
 ---

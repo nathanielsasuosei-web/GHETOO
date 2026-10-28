@@ -140,7 +140,7 @@ export default function Orders({ data, refresh, toast }) {
             <thead>
               <tr>
                 <th>Supporter</th>
-                <th>Release</th>
+                <th>Supported art</th>
                 <th>Amount</th>
                 <th>Method</th>
                 <th>Status</th>

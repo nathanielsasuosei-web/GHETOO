@@ -3,6 +3,8 @@ import multer from 'multer';
 import path from 'node:path';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
+import { MUSIC_PLATFORMS, normalizeStreamingUrl, safeStreamingUrl, videoYouTubeUrl } from '../src/lib/streaming.js';
+import { MIN_SUPPORT_PESEWAS, MAX_SUPPORT_PESEWAS, isValidSupportMinimum, supportMinimum } from '../src/lib/support.js';
 import { getState, save, saveNow, UPLOAD_DIR, DATA_DIR, id, reference } from './db.js';
 import {
   createSession,
@@ -72,8 +74,8 @@ app.use((req, res, next) => {
 });
 
 // ---------------------------------------------------------------- helpers
-const PESEWA_MIN = 100; // GHS 1.00
-const PESEWA_MAX = 5_000_000; // GHS 50,000
+const PESEWA_MIN = MIN_SUPPORT_PESEWAS; // GHS 1.00
+const PESEWA_MAX = MAX_SUPPORT_PESEWAS; // GHS 50,000
 const emailOk = (v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v);
 const clampText = (v, max) => String(v ?? '').trim().slice(0, max);
 const toPesewas = (v) => {
@@ -125,8 +127,13 @@ function removeMedia(urlPath) {
   }
 }
 
+function adminTrack(track) {
+  return { ...track, minAmount: supportMinimum(getState().settings.minSupport) };
+}
+
 function publicTrack(t) {
   return {
+    ...Object.fromEntries(MUSIC_PLATFORMS.map(({ key }) => [key, safeStreamingUrl(key, t[key])])),
     id: t.id,
     slug: t.slug,
     title: t.title,
@@ -136,11 +143,13 @@ function publicTrack(t) {
     credits: t.credits,
     cover: t.cover,
     duration: t.duration,
-    minAmount: t.minAmount,
+    // Keep the old response field for clients, but use the artist's global minimum.
+    minAmount: supportMinimum(getState().settings.minSupport),
     plays: t.plays,
     downloads: t.downloads,
     featured: Boolean(t.featured),
-    allowStream: t.allowStream !== false,
+    allowStream: Boolean(t.audio) && t.allowStream !== false,
+    hasDownload: Boolean(t.audio),
     lyrics: t.lyrics || '',
     createdAt: t.createdAt,
     streamUrl: `/api/stream/${t.id}`,
@@ -205,6 +214,7 @@ function publicVideo(v) {
     views: v.views,
     featured: Boolean(v.featured),
     createdAt: v.createdAt,
+    youtubeUrl: videoYouTubeUrl(v),
     src: v.source === 'url' ? v.src : `/api/video/${v.id}`,
     embedSrc: v.source === 'url' ? v.src : null,
   };
@@ -220,12 +230,15 @@ function publicOrder(o) {
     provider: o.provider || null,
     trackTitle: o.trackTitle || 'General support',
     trackId: o.trackId || null,
+    videoId: o.videoId || null,
+    videoTitle: o.videoTitle || null,
     supporterName: o.anonymous ? 'Anonymous supporter' : o.supporterName,
     message: o.message || '',
     createdAt: o.createdAt,
     confirmedAt: o.confirmedAt || null,
     demo: Boolean(o.demo),
-    downloadToken: o.status === 'paid' && o.trackId ? o.downloadToken || null : null,
+    downloadToken:
+      o.status === 'paid' && o.trackId && getTrack(getState(), o.trackId)?.audio ? o.downloadToken || null : null,
   };
 }
 
@@ -271,7 +284,9 @@ function getTrack(state, key) {
 function markPaid(order, extra = {}) {
   order.status = 'paid';
   order.confirmedAt = new Date().toISOString();
-  order.downloadToken ||= crypto.randomBytes(18).toString('base64url');
+  if (order.trackId && getTrack(getState(), order.trackId)?.audio) {
+    order.downloadToken ||= crypto.randomBytes(18).toString('base64url');
+  }
   Object.assign(order, extra);
   return order;
 }
@@ -354,6 +369,42 @@ function uploadedUrl(file) {
   return `/uploads/${rel}`;
 }
 
+function discardUploads(files) {
+  for (const group of Object.values(files || {})) {
+    for (const file of group) {
+      try {
+        fs.unlinkSync(file.path);
+      } catch {
+        // An already-removed upload needs no further cleanup.
+      }
+    }
+  }
+}
+
+function musicLinksFrom(body, partial = false) {
+  const links = {};
+  for (const { key } of MUSIC_PLATFORMS) {
+    if (!partial || body[key] !== undefined) links[key] = normalizeStreamingUrl(key, body[key]);
+  }
+  return links;
+}
+
+function normalizeVideoSource(value) {
+  if (typeof value !== 'string' || value.length > 2048) throw new Error('Enter a valid video URL.');
+  let url;
+  try {
+    url = new URL(value.trim());
+  } catch {
+    throw new Error('Enter a valid video URL.');
+  }
+  if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password) {
+    throw new Error('Enter a valid video URL.');
+  }
+  const youtube = MUSIC_PLATFORMS.find(({ key }) => key === 'youtubeUrl');
+  if (youtube.hosts.includes(url.hostname.toLowerCase())) return normalizeStreamingUrl('youtubeUrl', value);
+  return url.href;
+}
+
 // ---------------------------------------------------------------- public API
 app.get('/api/health', (req, res) => res.json({ ok: true, mode: paymentMode() }));
 
@@ -383,7 +434,8 @@ app.get('/api/site', (req, res) => {
     stats,
     paymentMode: paymentMode(),
     momoProviders: MOMO_PROVIDERS,
-    minSupport: PESEWA_MIN,
+    minSupport: supportMinimum(state.settings.minSupport),
+    maxSupport: PESEWA_MAX,
   });
 });
 
@@ -440,14 +492,18 @@ app.post('/api/orders', async (req, res) => {
   const state = getState();
   const body = req.body || {};
   const method = body.method === 'card' ? 'card' : 'momo';
+  if (body.trackId && body.videoId) return res.status(400).json({ error: 'Choose a song or a video, not both.' });
   const track = body.trackId ? getTrack(state, body.trackId) : null;
+  const video = body.videoId ? state.videos.find((item) => item.id === body.videoId) : null;
   if (body.trackId && !track) return res.status(400).json({ error: 'That release no longer exists.' });
   if (track && track.published === false) return res.status(400).json({ error: 'That release is not available.' });
+  if (body.videoId && !video) return res.status(400).json({ error: 'That video no longer exists.' });
+  if (video && video.published === false) return res.status(400).json({ error: 'That video is not available.' });
 
-  const amount = toPesewas(body.amount);
-  const floor = Math.max(PESEWA_MIN, track?.minAmount || 0);
-  if (!Number.isFinite(amount) || amount < floor) {
-    return res.status(400).json({ error: `Minimum support for this is GH₵${(floor / 100).toFixed(0)}.` });
+  const amount = Number(body.amount);
+  const floor = supportMinimum(state.settings.minSupport);
+  if (!Number.isSafeInteger(amount) || amount < floor) {
+    return res.status(400).json({ error: `Minimum support is GH₵${(floor / 100).toFixed(2)}.` });
   }
   if (amount > PESEWA_MAX) return res.status(400).json({ error: 'That amount is too large for checkout.' });
 
@@ -472,7 +528,9 @@ app.post('/api/orders', async (req, res) => {
     id: id('ord_'),
     reference: reference(),
     trackId: track?.id || null,
-    trackTitle: track?.title || 'General support',
+    videoId: video?.id || null,
+    videoTitle: video?.title || null,
+    trackTitle: track?.title || video?.title || 'General support',
     amount,
     currency: 'GHS',
     method,
@@ -497,7 +555,7 @@ app.post('/api/orders', async (req, res) => {
           email,
           reference: order.reference,
           callbackUrl: `${origin}/api/payments/callback`,
-          metadata: { trackId: order.trackId, trackTitle: order.trackTitle, supporter: order.supporterName },
+          metadata: { trackId: order.trackId, videoId: order.videoId, trackTitle: order.trackTitle, supporter: order.supporterName },
         });
         order.authorizationUrl = data.authorization_url;
         state.orders.push(order);
@@ -832,7 +890,7 @@ app.get('/api/admin/overview', (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   res.json({
     settings: state.settings,
-    tracks: state.tracks,
+    tracks: state.tracks.map(adminTrack),
     videos: state.videos,
     orders: state.orders.slice().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
     messages: state.messages,
@@ -852,6 +910,11 @@ app.get('/api/admin/overview', (req, res) => {
 app.patch('/api/admin/settings', (req, res) => {
   const state = getState();
   const body = req.body || {};
+  if (body.minSupport !== undefined && !isValidSupportMinimum(body.minSupport)) {
+    return res.status(400).json({
+      error: `Set a minimum between GH₵${(PESEWA_MIN / 100).toFixed(2)} and GH₵${(PESEWA_MAX / 100).toFixed(2)}.`,
+    });
+  }
   const allowed = [
     'artistName',
     'tagline',
@@ -863,6 +926,7 @@ app.patch('/api/admin/settings', (req, res) => {
     'portraitImage',
     'heroFocus',
     'supportNote',
+    'minSupport',
     'announcement',
     'cardEnabled',
     'goalAmount',
@@ -910,10 +974,27 @@ app.post('/api/admin/tracks', upload.fields([{ name: 'audio', maxCount: 1 }, { n
   const state = getState();
   const body = req.body || {};
   const title = clampText(body.title, 120);
-  if (!title) return res.status(400).json({ error: 'A title is required.' });
   const audioFile = req.files?.audio?.[0];
   const coverFile = req.files?.cover?.[0];
-  if (!audioFile) return res.status(400).json({ error: 'Add an audio file (MP3 or WAV).' });
+  if (body.minAmount !== undefined) {
+    discardUploads(req.files);
+    return res.status(400).json({ error: 'Set the support minimum in Studio → Settings; it applies to all support.' });
+  }
+  if (!title) {
+    discardUploads(req.files);
+    return res.status(400).json({ error: 'A title is required.' });
+  }
+  let streamingLinks;
+  try {
+    streamingLinks = musicLinksFrom(body);
+  } catch (err) {
+    discardUploads(req.files);
+    return res.status(400).json({ error: err.message });
+  }
+  if (!audioFile && !Object.values(streamingLinks).some(Boolean)) {
+    discardUploads(req.files);
+    return res.status(400).json({ error: 'Add an audio file or a streaming platform link.' });
+  }
 
   let baseSlug = slugify(body.slug || title);
   let slug = baseSlug;
@@ -930,9 +1011,9 @@ app.post('/api/admin/tracks', upload.fields([{ name: 'audio', maxCount: 1 }, { n
     credits: clampText(body.credits, 300),
     lyrics: clampText(body.lyrics, 8000),
     cover: coverFile ? uploadedUrl(coverFile) : '/media/covers/placeholder.jpg',
-    audio: uploadedUrl(audioFile),
+    audio: audioFile ? uploadedUrl(audioFile) : '',
+    ...streamingLinks,
     duration: Number(body.duration) || 0,
-    minAmount: Math.max(0, toPesewas(body.minAmount) || 0),
     plays: 0,
     downloads: 0,
     featured: body.featured === 'true' || body.featured === true,
@@ -943,7 +1024,7 @@ app.post('/api/admin/tracks', upload.fields([{ name: 'audio', maxCount: 1 }, { n
   if (track.featured) state.tracks.forEach((t) => (t.featured = false));
   state.tracks.unshift(track);
   saveNow();
-  res.status(201).json({ track });
+  res.status(201).json({ track: adminTrack(track) });
 });
 
 app.patch('/api/admin/tracks/:id', (req, res) => {
@@ -951,13 +1032,27 @@ app.patch('/api/admin/tracks/:id', (req, res) => {
   const track = state.tracks.find((t) => t.id === req.params.id);
   if (!track) return res.status(404).json({ error: 'Track not found' });
   const body = req.body || {};
-  const fields = ['title', 'genre', 'year', 'description', 'credits', 'lyrics', 'minAmount', 'duration', 'featured', 'published', 'allowStream'];
+  if (body.minAmount !== undefined) {
+    return res.status(400).json({ error: 'Set the support minimum in Studio → Settings; it applies to all support.' });
+  }
+  let streamingLinks;
+  try {
+    streamingLinks = musicLinksFrom(body, true);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+  const nextLinks = { ...track, ...streamingLinks };
+  if (!track.audio && !MUSIC_PLATFORMS.some(({ key }) => safeStreamingUrl(key, nextLinks[key]))) {
+    return res.status(400).json({ error: 'This release needs an audio file or at least one streaming link.' });
+  }
+  const fields = ['title', 'genre', 'year', 'description', 'credits', 'lyrics', 'duration', 'featured', 'published', 'allowStream'];
   for (const key of fields) {
     if (body[key] !== undefined) track[key] = body[key];
   }
+  Object.assign(track, streamingLinks);
   if (body.featured === true) state.tracks.forEach((t) => (t.featured = t.id === track.id));
   saveNow();
-  res.json({ track });
+  res.json({ track: adminTrack(track) });
 });
 
 app.post('/api/admin/tracks/:id/cover', upload.single('cover'), (req, res) => {
@@ -965,10 +1060,10 @@ app.post('/api/admin/tracks/:id/cover', upload.single('cover'), (req, res) => {
   const track = state.tracks.find((t) => t.id === req.params.id);
   if (!track) return res.status(404).json({ error: 'Track not found' });
   if (!req.file) return res.status(400).json({ error: 'No image uploaded.' });
-  removeMedia(track.cover);
+  if (track.cover?.startsWith('/uploads/covers/')) removeMedia(track.cover);
   track.cover = uploadedUrl(req.file);
   saveNow();
-  res.json({ track });
+  res.json({ track: adminTrack(track) });
 });
 
 app.delete('/api/admin/tracks/:id', (req, res) => {
@@ -976,8 +1071,8 @@ app.delete('/api/admin/tracks/:id', (req, res) => {
   const idx = state.tracks.findIndex((t) => t.id === req.params.id);
   if (idx === -1) return res.status(404).json({ error: 'Track not found' });
   const [track] = state.tracks.splice(idx, 1);
-  removeMedia(track.audio);
-  removeMedia(track.cover);
+  if (track.audio?.startsWith('/uploads/audio/')) removeMedia(track.audio);
+  if (track.cover?.startsWith('/uploads/covers/')) removeMedia(track.cover);
   saveNow();
   res.json({ ok: true });
 });
@@ -987,14 +1082,23 @@ app.post('/api/admin/videos', upload.fields([{ name: 'video', maxCount: 1 }, { n
   const state = getState();
   const body = req.body || {};
   const title = clampText(body.title, 140);
-  if (!title) return res.status(400).json({ error: 'A title is required.' });
   const videoFile = req.files?.video?.[0];
   const thumbFile = req.files?.thumb?.[0];
   const isUrl = String(body.source || 'file') === 'url';
-  if (!isUrl && !videoFile) return res.status(400).json({ error: 'Upload a video file or switch to a link.' });
-  if (isUrl && !/^https?:\/\//.test(String(body.url || ''))) {
-    return res.status(400).json({ error: 'Enter a valid video URL.' });
+  if (!title || (!isUrl && !videoFile)) {
+    discardUploads(req.files);
+    return res.status(400).json({ error: !title ? 'A title is required.' : 'Upload a video file or switch to a link.' });
   }
+  let youtubeUrl;
+  let sourceUrl;
+  try {
+    youtubeUrl = normalizeStreamingUrl('youtubeUrl', body.youtubeUrl);
+    if (isUrl) sourceUrl = normalizeVideoSource(body.url);
+  } catch (err) {
+    discardUploads(req.files);
+    return res.status(400).json({ error: err.message });
+  }
+  if (isUrl && videoFile) discardUploads({ video: [videoFile] });
 
   const video = {
     id: id('vid_'),
@@ -1002,7 +1106,8 @@ app.post('/api/admin/videos', upload.fields([{ name: 'video', maxCount: 1 }, { n
     description: clampText(body.description, 1200),
     thumb: thumbFile ? uploadedUrl(thumbFile) : '/media/thumbs/placeholder.jpg',
     source: isUrl ? 'url' : 'file',
-    src: isUrl ? String(body.url) : uploadedUrl(videoFile),
+    src: isUrl ? sourceUrl : uploadedUrl(videoFile),
+    youtubeUrl,
     duration: Number(body.duration) || 0,
     views: 0,
     featured: body.featured === 'true' || body.featured === true,
@@ -1020,16 +1125,25 @@ app.patch('/api/admin/videos/:id', (req, res) => {
   const video = state.videos.find((v) => v.id === req.params.id);
   if (!video) return res.status(404).json({ error: 'Video not found' });
   const body = req.body || {};
+  let youtubeUrl;
+  let sourceUrl;
+  try {
+    if (body.youtubeUrl !== undefined) youtubeUrl = normalizeStreamingUrl('youtubeUrl', body.youtubeUrl);
+    if (body.url !== undefined) sourceUrl = normalizeVideoSource(body.url);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
   for (const key of ['title', 'description', 'featured', 'published', 'thumb', 'url']) {
     if (body[key] !== undefined) {
       if (key === 'url') {
-        video.src = body.url;
+        video.src = sourceUrl;
         video.source = 'url';
       } else {
         video[key] = body[key];
       }
     }
   }
+  if (youtubeUrl !== undefined) video.youtubeUrl = youtubeUrl;
   if (body.featured === true) state.videos.forEach((v) => (v.featured = v.id === video.id));
   saveNow();
   res.json({ video });
@@ -1040,8 +1154,8 @@ app.delete('/api/admin/videos/:id', (req, res) => {
   const idx = state.videos.findIndex((v) => v.id === req.params.id);
   if (idx === -1) return res.status(404).json({ error: 'Video not found' });
   const [video] = state.videos.splice(idx, 1);
-  if (video.source === 'file') removeMedia(video.src);
-  removeMedia(video.thumb);
+  if (video.source === 'file' && video.src?.startsWith('/uploads/videos/')) removeMedia(video.src);
+  if (video.thumb?.startsWith('/uploads/thumbs/')) removeMedia(video.thumb);
   saveNow();
   res.json({ ok: true });
 });

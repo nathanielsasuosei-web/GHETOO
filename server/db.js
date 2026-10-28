@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { seedState } from './seed.js';
+import { MIN_SUPPORT_PESEWAS, MAX_SUPPORT_PESEWAS } from '../src/lib/support.js';
 
 const ROOT = process.cwd();
 export const DATA_DIR = process.env.DATA_DIR || path.join(ROOT, 'data');
@@ -39,9 +40,19 @@ export function getState() {
     state = seedState();
     persist();
   }
-  // forward-compatible defaults
+  // Preserve existing release minimums when moving to one global minimum.
+  const hadGlobalMinimum = Object.prototype.hasOwnProperty.call(state.settings || {}, 'minSupport');
   state.settings = { ...seedState().settings, ...state.settings };
   state.tracks ||= [];
+  if (!hadGlobalMinimum) {
+    state.settings.minSupport = state.tracks.reduce((highest, track) => {
+      const legacy = Number(track.minAmount);
+      if (!Number.isFinite(legacy)) return highest;
+      return Math.max(highest, Math.min(MAX_SUPPORT_PESEWAS, Math.ceil(legacy)));
+    }, MIN_SUPPORT_PESEWAS);
+    persist();
+  }
+  // Forward-compatible defaults for older databases.
   state.videos ||= [];
   state.orders ||= [];
   state.messages ||= [];

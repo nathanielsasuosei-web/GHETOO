@@ -11,7 +11,7 @@ export default function Videos() {
     <>
       <section className="page-hero">
         <div className="container">
-          <span className="eyebrow">Visuals · {compact(site.stats.views)} views</span>
+          <span className="eyebrow">Visuals · {compact(site.stats.views)} site opens</span>
           <h1>Videos</h1>
           <p>Visuals, live sessions and studio diaries. Shot in Accra, mostly on borrowed cameras and stubbornness.</p>
         </div>

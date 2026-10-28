@@ -1,14 +1,17 @@
 import { useState } from 'react';
 import Icon from './Icon';
 import LyricsModal from './LyricsModal';
+import TrackListen from './TrackListen';
+import { trackPlatformLinks } from '../lib/streaming';
 import { usePlayer } from '../context/PlayerContext';
 import { useSupport } from '../context/SupportContext';
 import { cedis, compact } from '../lib/format';
 
 export default function TrackRow({ track, index, list }) {
-  const { play, isCurrent, playing } = usePlayer();
+  const { isCurrent, playing } = usePlayer();
   const { openSupport } = useSupport();
   const current = isCurrent(track.id);
+  const platformLinks = trackPlatformLinks(track);
   const [showLyrics, setShowLyrics] = useState(false);
 
   return (
@@ -27,13 +30,9 @@ export default function TrackRow({ track, index, list }) {
 
       <div className="track__art">
         <img src={track.cover} alt={`${track.title} cover art`} loading="lazy" />
-        <button
-          className="track__artbtn"
-          onClick={() => play(track, list)}
-          aria-label={`${current && playing ? 'Pause' : 'Play'} ${track.title}`}
-        >
-          <Icon name={current && playing ? 'pause' : 'play'} size={18} />
-        </button>
+        <TrackListen track={track} list={list} className="track__artbtn">
+          {({ playing: isPlaying }) => <Icon name={isPlaying ? 'pause' : 'play'} size={18} />}
+        </TrackListen>
       </div>
 
       <div className="track__info">
@@ -50,9 +49,25 @@ export default function TrackRow({ track, index, list }) {
           {track.genre} · {track.year}
           {track.description ? ` · ${track.description.slice(0, 70)}${track.description.length > 70 ? '…' : ''}` : ''}
         </p>
+        {platformLinks.length ? (
+          <div className="track__platforms" aria-label={`Streaming platforms for ${track.title}`}>
+            <span>Listen on</span>
+            {platformLinks.map((link) => (
+              <a
+                key={link.key}
+                href={link.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`Listen to ${track.title} on ${link.label} (opens in a new tab)`}
+              >
+                {link.label} <Icon name="arrowUpRight" size={11} />
+              </a>
+            ))}
+          </div>
+        ) : null}
       </div>
 
-      <div className="track__stat">
+      <div className="track__stat" title="On-site plays, not platform streams">
         <Icon name="headphone" size={13} />
         {compact(track.plays)}
       </div>
@@ -66,10 +81,14 @@ export default function TrackRow({ track, index, list }) {
           <Icon name="heart" size={13} />
           Support
         </button>
-        <button className="btn btn--ghost btn--sm" onClick={() => play(track, list)}>
-          <Icon name={current && playing ? 'pause' : 'play'} size={13} />
-          {current && playing ? 'Pause' : 'Play'}
-        </button>
+        <TrackListen track={track} list={list} className="btn btn--ghost btn--sm">
+          {({ link, playing: isPlaying }) => (
+            <>
+              <Icon name={link ? 'external' : isPlaying ? 'pause' : 'play'} size={13} />
+              {link ? 'Listen' : isPlaying ? 'Pause' : 'Play'}
+            </>
+          )}
+        </TrackListen>
       </div>
 
       {showLyrics ? <LyricsModal track={track} onClose={() => setShowLyrics(false)} /> : null}

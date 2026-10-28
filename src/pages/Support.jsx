@@ -70,7 +70,7 @@ export default function Support() {
             </div>
             <div className="stat-card">
               <span>
-                <Icon name="headphone" size={13} /> Streams
+                <Icon name="headphone" size={13} /> On-site plays
               </span>
               <strong>{stats.plays.toLocaleString()}</strong>
               <em>across {stats.tracks} releases</em>
@@ -84,7 +84,7 @@ export default function Support() {
             </div>
             <div className="stat-card">
               <span>
-                <Icon name="video" size={13} /> Video views
+                <Icon name="video" size={13} /> On-site video opens
               </span>
               <strong>{stats.views.toLocaleString()}</strong>
               <em>{stats.videos} visuals online</em>
