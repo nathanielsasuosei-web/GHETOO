@@ -325,3 +325,17 @@ export function resolveTheme(settings) {
   }
   return { theme: serverTheme, source: 'server', savedAt: settings?.themeUpdatedAt || '', serverAt };
 }
+
+/**
+ * A palette is published only when an anonymous `/api/site` response contains
+ * it. Trusting the PATCH echo alone is not enough: an older API can answer 200
+ * while quietly dropping `theme`, and a device copy is visible to one browser
+ * only. Use this after saving before telling the artist every visitor can see
+ * their colours.
+ */
+export function themePublished(site, palette) {
+  const settings = site?.settings;
+  if (!settings || typeof settings !== 'object') return false;
+  if (!settings.theme || typeof settings.theme !== 'object' || Array.isArray(settings.theme)) return false;
+  return themeMatches(settings.theme, palette);
+}

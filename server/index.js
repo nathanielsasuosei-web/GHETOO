@@ -17,7 +17,8 @@ import {
   requireFan,
   currentFan,
 } from './fans.js';
-import { getState, save, saveNow, UPLOAD_DIR, DATA_DIR, id, reference } from './db.js';
+import { getState, save, saveNow, UPLOAD_DIR, DATA_DIR, DATA_DIR_CONFIGURED, BOOT_COUNT, id, reference } from './db.js';
+import { capabilities } from './capabilities.js';
 import {
   createSession,
   readSession,
@@ -497,7 +498,12 @@ function normalizeVideoSource(value) {
 }
 
 // ---------------------------------------------------------------- public API
-app.get('/api/health', (req, res) => res.json({ ok: true, mode: paymentMode() }));
+// Deployment probe: `/api/health` tells the studio whether the API in front of
+// it is the current build and whether its DATA_DIR survives a restart.
+app.get('/api/health', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ ok: true, mode: paymentMode(), ...capabilities() });
+});
 
 app.get('/api/site', (req, res) => {
   const state = getState();
@@ -529,6 +535,7 @@ app.get('/api/site', (req, res) => {
     maxSupport: PESEWA_MAX,
     supportMode: SUPPORT_MODES.includes(state.settings.supportMode) ? state.settings.supportMode : 'open',
     supportAmounts: publicSupportAmounts(state.settings, supportMinimum(state.settings.minSupport)),
+    capabilities: capabilities(),
     liquidGlass: state.settings.liquidGlass !== false,
     glassIntensity: GLASS_INTENSITIES.includes(state.settings.glassIntensity)
       ? state.settings.glassIntensity
@@ -1151,6 +1158,7 @@ app.get('/api/admin/overview', (req, res) => {
     byMethod,
     byTrack: Object.values(byTrack).sort((a, b) => b.amount - a.amount),
     paymentMode: paymentMode(),
+    capabilities: capabilities(),
   });
 });
 
@@ -1226,8 +1234,18 @@ app.patch('/api/admin/settings', (req, res) => {
   if (body.socials && typeof body.socials === 'object') {
     state.settings.socials = { ...state.settings.socials, ...body.socials };
   }
-  saveNow();
-  res.json({ settings: state.settings });
+  // A save only counts once it is on disk. On a read-only or ephemeral volume
+  // we must fail loudly instead of telling the artist the palette was published.
+  try {
+    saveNow();
+  } catch (err) {
+    console.error('settings save failed:', err);
+    return res.status(500).json({
+      error: 'Settings could not be written to disk. Check that DATA_DIR points at writable, persistent storage.',
+    });
+  }
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ settings: state.settings, capabilities: capabilities() });
 });
 
 // ---- site imagery (hero + portrait)
@@ -1842,6 +1860,13 @@ app.listen(PORT, '0.0.0.0', () => {
   const state = getState();
   console.log(`Young Silence · listening on http://0.0.0.0:${PORT}`);
   console.log(`Payments: ${paymentMode()} · Studio password: ${process.env.ARTIST_PASSWORD ? 'set via env' : 'youngsilence (default)'}`);
+  console.log(`API build: ${capabilities().version} · theme storage: on`);
+  console.log(
+    `Data: ${DATA_DIR} · boot #${BOOT_COUNT} on this volume · ${DATA_DIR_CONFIGURED ? 'DATA_DIR configured' : 'default ./data (set DATA_DIR to a persistent volume in production)'}`
+  );
+  if (!DATA_DIR_CONFIGURED) {
+    console.warn('WARNING: DATA_DIR is not set. On ephemeral hosts settings, themes and uploads reset on every restart.');
+  }
   console.log(
     `${state.tracks.length} tracks · ${state.videos.length} videos · ${state.orders.length} support orders · ${state.events.length} events · ${state.products.length} products · ${state.subscribers.length} subscribers`
   );

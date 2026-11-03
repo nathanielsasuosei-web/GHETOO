@@ -13,6 +13,7 @@ import {
   storeTheme,
   suggestText,
   themeMatches,
+  themePublished,
   themeReport,
   themeVars,
 } from '../lib/theme';
@@ -99,6 +100,15 @@ export default function Appearance({ data, refresh, toast }) {
   const dirty = !themeMatches(draft, saved);
   // True when this browser is showing a palette the API has not stored yet.
   const deviceOnly = resolved.source === 'device' && !themeMatches(saved, data.settings.theme);
+  // The current backend advertises its build and storage in /api/site and
+  // /api/admin/overview. Older builds omit it entirely — that is the clue that
+  // a redeploy is needed rather than another save.
+  const apiIsCurrent = data?.capabilities?.themeStorage === true;
+  const apiDiagnosis = !apiIsCurrent
+    ? 'The API in front of the studio is running an older build that cannot store themes.'
+    : data.capabilities.dataDirConfigured === false
+      ? 'The API has no persistent DATA_DIR, so a restart or redeploy wipes the saved palette.'
+      : 'The API did not keep the last colour save, so only this device knows the palette.';
   const report = themeReport(draft);
   const activePreset = THEME_PRESETS.find((preset) => themeMatches(preset.theme, draft))?.id;
 
@@ -128,15 +138,28 @@ export default function Appearance({ data, refresh, toast }) {
     const palette = normalizeTheme(draft);
     try {
       const response = await api.saveSettings({ theme: palette });
-      const stored = response?.settings?.theme;
-      const accepted = Boolean(stored) && typeof stored === 'object' && themeMatches(stored, palette);
+      // The PATCH echo is not proof of publication: an older API answers 200
+      // while silently dropping `theme`. Check what an anonymous visitor gets.
+      let publicSite = null;
+      let checkFailed = false;
+      try {
+        publicSite = await api.siteFresh();
+      } catch {
+        checkFailed = true;
+      }
+      const accepted = checkFailed
+        ? themePublished(response, palette)
+        : themePublished(publicSite, palette);
       // Keep a device copy either way, so a reload never loses the palette while
       // an older API (or a redeploy that reset the JSON file) catches up.
-storeTheme(palette, accepted ? response.settings.themeUpdatedAt || undefined : undefined);
+      storeTheme(
+        palette,
+        accepted ? response?.settings?.themeUpdatedAt || publicSite?.settings?.themeUpdatedAt || undefined : undefined
+      );
       if (accepted) {
-        toast('Colours saved — the public site is updated');
+        toast('Colours published — every visitor now sees this palette');
       } else {
-        toast('Colours saved on this device, but the live API did not store them. Publish them by deploying the latest backend.', 'error');
+        toast('Colours saved on this device only. Deploy the latest backend with a persistent DATA_DIR, then press Publish colours.', 'error');
       }
       await refresh();
     } catch (err) {
@@ -178,9 +201,9 @@ storeTheme(palette, accepted ? response.settings.themeUpdatedAt || undefined : u
           <button type="button" className="btn btn--ghost btn--sm" onClick={() => setDraft({ ...THEME_DEFAULTS })} disabled={busy}>
             Reset default
           </button>
-          <button className="btn btn--gold btn--sm" disabled={!dirty || busy}>
+          <button className="btn btn--gold btn--sm" disabled={(!dirty && !deviceOnly) || busy}>
             <Icon name="check" size={15} />
-            {busy ? 'Saving…' : 'Save colours'}
+            {busy ? 'Saving…' : deviceOnly && !dirty ? 'Publish colours' : 'Save colours'}
           </button>
         </div>
       </div>
@@ -330,10 +353,14 @@ storeTheme(palette, accepted ? response.settings.themeUpdatedAt || undefined : u
               <div className="alert alert--info theme-device-note">
                 <Icon name="bolt" size={16} />
                 <span>
-                  These colours are saved on this device only. The API in front of the studio is not storing themes
-                  yet — deploy the latest backend (or give it a persistent <code>DATA_DIR</code>) and save again to
-                  publish them to every visitor.
+                  <strong>These colours are saved on this device only.</strong> {apiDiagnosis} Deploy the latest
+                  backend with a persistent <code>DATA_DIR</code>, then press{' '}
+                  <strong>Publish colours</strong> to send this palette to every visitor.
                 </span>
+                <button type="button" className="btn btn--gold btn--sm" onClick={save} disabled={busy}>
+                  <Icon name="check" size={14} />
+                  {busy ? 'Publishing…' : 'Publish colours'}
+                </button>
               </div>
             ) : null}
           </section>
@@ -360,6 +387,13 @@ storeTheme(palette, accepted ? response.settings.themeUpdatedAt || undefined : u
             <p className="field__hint" style={{ marginTop: 10 }}>
               Saved colours apply to every page — header, player, support panel and studio — for everyone who visits.
             </p>
+            {data?.capabilities ? (
+              <p className="field__hint" style={{ marginTop: 6 }}>
+                API build {data.capabilities.version} · theme storage{' '}
+                {data.capabilities.themeStorage ? 'on' : 'unavailable'} · DATA_DIR{' '}
+                {data.capabilities.dataDirConfigured ? 'on a persistent volume' : 'not configured'}.
+              </p>
+            ) : null}
           </section>
         </div>
       </div>
@@ -369,12 +403,12 @@ storeTheme(palette, accepted ? response.settings.themeUpdatedAt || undefined : u
           {dirty
             ? 'You have unsaved colour changes.'
             : deviceOnly
-              ? 'Saved on this device — deploy the latest backend to publish it to every visitor.'
+              ? 'Saved on this device — deploy the latest backend with a persistent DATA_DIR, then publish.'
               : 'Colours match the live site.'}
         </span>
-        <button className="btn btn--gold btn--sm" disabled={!dirty || busy}>
+        <button className="btn btn--gold btn--sm" disabled={(!dirty && !deviceOnly) || busy}>
           <Icon name="check" size={15} />
-          {busy ? 'Saving…' : 'Save colours'}
+          {busy ? 'Saving…' : deviceOnly && !dirty ? 'Publish colours' : 'Save colours'}
         </button>
       </div>
     </form>

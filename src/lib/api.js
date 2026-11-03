@@ -53,6 +53,10 @@ const del = (path) => request(path, { method: 'DELETE' });
 
 export const api = {
   site: () => get('/api/site'),
+  // Bust both the browser cache and the CDN/proxy cache: after a colour save
+  // this is exactly what an anonymous visitor will receive.
+  siteFresh: () => request(`/api/site?_=${Date.now()}`, { cache: 'no-store' }),
+  health: () => get('/api/health'),
   track: (key) => get(`/api/tracks/${encodeURIComponent(key)}`),
   countPlay: (id) => post(`/api/tracks/${id}/play`).catch(() => null),
   countView: (id) => post(`/api/video/${id}/view`).catch(() => null),
