@@ -177,6 +177,35 @@ const paths = {
     </>
   ),
   minus: <path d="M5 12h14" />,
+  chevronDown: <path d="m6 9.5 6 6 6-6" />,
+  chevronRight: <path d="m9.5 6 6 6-6 6" />,
+  grid: (
+    <>
+      <rect x="3" y="3" width="7" height="7" rx="1.8" />
+      <rect x="14" y="3" width="7" height="7" rx="1.8" />
+      <rect x="3" y="14" width="7" height="7" rx="1.8" />
+      <rect x="14" y="14" width="7" height="7" rx="1.8" />
+    </>
+  ),
+  search: (
+    <>
+      <circle cx="10.8" cy="10.8" r="6.8" />
+      <path d="m16 16 4.5 4.5" />
+    </>
+  ),
+  bell: (
+    <>
+      <path d="M18 9a6 6 0 0 0-12 0c0 6-2 7-2 7h16s-2-1-2-7Z" />
+      <path d="M10 20a2.4 2.4 0 0 0 4 0" />
+    </>
+  ),
+  panelLeft: (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="2.5" />
+      <path d="M9 4v16" />
+    </>
+  ),
+  bolt: <path d="M13 2 5 13h6l-1 9 8-11h-6l1-9Z" />,
 };
 
 export default function Icon({ name, size = 20, strokeWidth = 1.6, className = '', ...rest }) {
