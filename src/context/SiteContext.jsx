@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
+import { applyTheme } from '../lib/theme';
 
 const SiteContext = createContext(null);
 
@@ -28,6 +29,11 @@ export function SiteProvider({ children }) {
     if (!site) return;
     document.title = `${site.settings.artistName} — Music from ${site.settings.city?.split(',')[0] || 'Accra'}`;
   }, [site]);
+
+  // The owner's saved colours restyle the whole site (see Studio → Appearance).
+  useEffect(() => {
+    applyTheme(site?.settings?.theme);
+  }, [site?.settings?.theme]);
 
   const value = useMemo(() => ({ site, loading, error, reload: load }), [site, loading, error, load]);
   return <SiteContext.Provider value={value}>{children}</SiteContext.Provider>;

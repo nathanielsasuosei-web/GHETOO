@@ -40,6 +40,13 @@ Today his sound sits somewhere between Afrobeats and alté — Twi and Pidgin la
     announcement: 'New single — “Accra Nights” out now',
     goalAmount: 6000000,
     showRaised: true,
+    theme: {
+      accent: '#f0b354',
+      glow: '#9c8cff',
+      background: '#070910',
+      surface: '#10141e',
+      text: '#f8f5ef',
+    },
     contactEmail: 'hello@youngsilence.gh',
   };
 }
