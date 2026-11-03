@@ -14,6 +14,8 @@ No third-party CMS, no label, no gatekeepers. One Node process + a JSON file.
 
 **Public site**
 
+- **V12 interface:** floating glass navigation, an expanding hover/focus **Explore** menu,
+  refreshed cards, gradients and responsive mobile navigation
 - Cinematic home page: hero, featured release, catalogue, videos, upcoming shows, merch,
   supporter wall, bio
 - `/music` — full catalogue with links to Spotify, Apple Music and YouTube when configured,
@@ -33,6 +35,9 @@ No third-party CMS, no label, no gatekeepers. One Node process + a JSON file.
 
 **Artist studio (`/studio`)**
 
+- **V12 command centre:** a compact rail expands on hover or keyboard focus, with a pin
+  control to keep it open; quick jump via `/` or `Ctrl/Cmd + K`, alerts, a live status pulse,
+  glass panels and a refreshed login screen
 - Password-protected dashboard (default `youngsilence` — change it!)
 - Add releases with streaming-platform links and/or audio (MP3/WAV/M4A/FLAC + cover art),
   draft/live toggle, on-site streaming toggle, homepage spotlight and **lyrics editor**
@@ -175,6 +180,7 @@ src/
   components/    Header, Footer, Player, SupportModal, MerchModal, LyricsModal,
                  TrackRow, VideoSection, EventsSection, MerchSection, Newsletter, …
   context/       Site, Player, Support and Toast providers
+  styles*.css    Base design system plus the V12 visual layer
 scripts/         Demo media generator
 public/media/    Bundled artwork, audio and video (served at /media/…)
 ```
