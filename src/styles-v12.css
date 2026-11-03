@@ -2908,3 +2908,297 @@ body::before {
     text-align: center;
   }
 }
+
+/* ==========================================================================
+   Mobile & touch layer — the final word on small screens.
+   This stylesheet loads last, so these rules win any specificity ties
+   against the base sheet and the rest of the V12 layer.
+   ========================================================================== */
+
+html {
+  /* Stop iOS from inflating text in landscape, and keep tap feedback on-brand. */
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: rgba(var(--gold-rgb), 0.18);
+}
+
+/* No 300ms click delay or double-tap zoom on controls (pinch zoom untouched). */
+a,
+button,
+input,
+select,
+textarea {
+  touch-action: manipulation;
+}
+
+/* Auto-fill grids must never force a sideways scroll on narrow phones. */
+.video-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(310px, 100%), 1fr));
+}
+
+.wall {
+  grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
+}
+
+.merch-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
+}
+
+.video-card__meta {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+
+/* Touch devices have no hover — keep the cover-art play control visible. */
+@media (hover: none) {
+  .track__artbtn {
+    opacity: 1;
+    background: rgba(var(--ink-rgb), 0.42);
+  }
+}
+
+@media (max-width: 900px) {
+  .container {
+    padding: 0 20px;
+  }
+
+  .section {
+    padding: 72px 0;
+  }
+
+  .section--tight {
+    padding: 54px 0;
+  }
+
+  .section-head {
+    margin-bottom: 26px;
+  }
+
+  .page-hero {
+    padding: 134px 0 52px;
+  }
+
+  .thanks {
+    padding: 126px 0 84px;
+  }
+
+  .footer {
+    padding: 56px 0 calc(112px + env(safe-area-inset-bottom));
+  }
+
+  .footer__col a,
+  .footer__col span {
+    padding: 9px 0;
+  }
+
+  /* iOS zooms into fields under 16px — keep every phone field readable. */
+  .field input,
+  .field textarea,
+  .field select,
+  .newsletter__form input,
+  .theme-field__hex {
+    font-size: 16px;
+  }
+
+  .amount-input input {
+    font-size: 20px;
+  }
+
+  /* Player: home-indicator clearance, bigger seek target, full transport. */
+  .player {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .player__progress::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 -12px;
+  }
+
+  .player-spacer {
+    height: calc(96px + env(safe-area-inset-bottom));
+  }
+
+  .player__controls .player__btn:not(.player__btn--main) {
+    display: grid;
+  }
+
+  .toasts {
+    bottom: calc(106px + env(safe-area-inset-bottom));
+  }
+
+  /* Dialogs: tighter chrome, thumb-sized close, dynamic viewport height. */
+  .modal-backdrop {
+    padding: 14px;
+  }
+
+  .modal {
+    max-height: calc(100vh - 28px);
+    max-height: calc(100dvh - 28px);
+  }
+
+  .modal__close {
+    width: 40px;
+    height: 40px;
+  }
+
+  .lightbox {
+    padding: 14px;
+    overflow-y: auto;
+    place-items: safe center;
+  }
+
+  .lightbox__video {
+    max-height: 64vh;
+  }
+
+  .mobile-nav.v12-mobile-nav {
+    max-height: calc(100vh - 82px);
+    max-height: calc(100dvh - 82px);
+  }
+
+  /* Tables scroll sideways instead of crushing their columns. */
+  .table-wrap {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+  }
+
+  .v12-content .table {
+    min-width: 540px;
+  }
+}
+
+@media (max-width: 560px) {
+  .container {
+    padding: 0 16px;
+  }
+
+  .notice-bar {
+    font-size: 10.5px;
+    padding: 7px 12px;
+    gap: 8px;
+  }
+
+  .section {
+    padding: 58px 0;
+  }
+
+  .section--tight {
+    padding: 46px 0;
+  }
+
+  .page-hero {
+    padding: 122px 0 44px;
+  }
+
+  .panel {
+    padding: 16px;
+  }
+
+  .stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .thanks {
+    padding: 116px 0 74px;
+  }
+
+  /* Sheet-style modals: near fullscreen with calmer padding. */
+  .modal-backdrop {
+    padding: 10px;
+  }
+
+  .modal {
+    border-radius: 18px;
+    max-height: calc(100vh - 20px);
+    max-height: calc(100dvh - 20px);
+  }
+
+  .modal__head {
+    padding: 20px 18px 0;
+    gap: 12px;
+  }
+
+  .modal__head h3 {
+    font-size: 25px;
+  }
+
+  .modal__body {
+    padding: 18px 18px 22px;
+  }
+
+  .lightbox__head h3 {
+    font-size: 23px;
+  }
+
+  /* Track rows: wrap long titles, roomier support button. */
+  .track__info h3 {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+
+  .track__actions .btn {
+    height: 40px;
+    padding: 0 14px;
+    font-size: 12px;
+  }
+
+  .video-card__support {
+    padding: 10px 14px;
+    font-size: 12.5px;
+  }
+
+  .icon-btn--sm {
+    width: 40px;
+    height: 40px;
+  }
+
+  .copy-row button {
+    width: 36px;
+    height: 36px;
+  }
+
+  .pay__amount {
+    font-size: 44px;
+  }
+
+  /* Player transport sized for thumbs. */
+  .player__inner {
+    gap: 10px;
+    padding: 0 12px;
+  }
+
+  .player__art {
+    width: 40px;
+    height: 40px;
+  }
+
+  .player__controls {
+    gap: 2px;
+  }
+
+  .player__btn {
+    width: 36px;
+    height: 36px;
+  }
+
+  .player__btn--main {
+    width: 44px;
+    height: 44px;
+  }
+
+  .player__close {
+    width: 36px;
+    height: 36px;
+  }
+
+  .empty {
+    padding: 36px 18px;
+  }
+}
+
+@media (max-width: 480px) {
+  .footer__top {
+    grid-template-columns: 1fr;
+    gap: 26px;
+  }
+}
