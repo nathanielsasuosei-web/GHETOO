@@ -19,7 +19,14 @@ Today his sound sits somewhere between Afrobeats and alté — Twi and Pidgin la
     heroImage: '/media/hero.jpg',
     portraitImage: '/media/portrait.jpg',
     heroFocus: 'center',
-    monogramImage: '/media/logo.png',
+    // Branding: empty logoImage means the "YS" monogram is drawn in CSS.
+    logoImage: '',
+    faviconImage: '/favicon.svg',
+    // Artist-controlled pricing and the liquid-glass visual layer.
+    supportMode: 'open',
+    suggestedAmounts: [],
+    liquidGlass: true,
+    glassIntensity: 'balanced',
     momo: {
       mtn: '024 000 0000',
       telecel: '',
@@ -388,5 +395,6 @@ Yeah, silence speaks`,
       { id: 'sub_seed_3', email: 'naa@example.com', createdAt: ago(9) },
       { id: 'sub_seed_4', email: 'efua@example.com', createdAt: ago(2) },
     ],
+    fans: [],
   };
 }

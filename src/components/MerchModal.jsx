@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Icon from './Icon';
 import { useSite } from '../context/SiteContext';
+import { useFan } from '../context/FanContext';
 import { api } from '../lib/api';
 import { cedis } from '../lib/format';
 
@@ -39,6 +40,7 @@ function CopyRow({ label, value }) {
 
 export default function MerchModal({ product, onClose }) {
   const { site } = useSite();
+  const { fan, refreshOrders } = useFan();
   const [step, setStep] = useState('form');
   const [size, setSize] = useState(product?.sizes?.[0] || '');
   const [qty, setQty] = useState(1);
@@ -65,6 +67,14 @@ export default function MerchModal({ product, onClose }) {
       window.removeEventListener('keydown', onKey);
     };
   }, [onClose]);
+
+  // Signed-in fans get their delivery details filled in automatically.
+  useEffect(() => {
+    if (!product) return;
+    setName(fan?.name || '');
+    setEmail(fan?.email || '');
+    setPhone(fan?.phone || '');
+  }, [product?.id, fan?.name, fan?.email, fan?.phone]);
 
   useEffect(() => {
     if (step !== 'pending' || !order?.reference) return;
@@ -127,6 +137,7 @@ export default function MerchModal({ product, onClose }) {
       setOrder(result.order || null);
       setMomo(result.momo || null);
       setStep(result.status === 'paid' ? 'paid' : 'pending');
+      if (fan) refreshOrders();
     } catch (err) {
       setError(err.message);
     } finally {

@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import Icon from '../components/Icon';
 import { api } from '../lib/api';
+import { initials } from '../lib/format';
 import { useToast } from '../context/ToastContext';
+
+const LABELS = { hero: 'Hero photo', portrait: 'Portrait photo', logo: 'Logo', favicon: 'Browser icon' };
 
 const FOCUS = [
   { id: 'left', label: 'Left', position: '22% 40%' },
@@ -47,9 +51,9 @@ export default function Website({ data, refresh }) {
   const [dirty, setDirty] = useState(false);
   const [savingCopy, setSavingCopy] = useState(false);
 
-  const [uploading, setUploading] = useState(null); // 'hero' | 'portrait'
+  const [uploading, setUploading] = useState(null); // 'hero' | 'portrait' | 'logo' | 'favicon'
   const [progress, setProgress] = useState(0);
-  const [preview, setPreview] = useState({ hero: null, portrait: null });
+  const [preview, setPreview] = useState({});
   const objectUrls = useRef([]);
 
   // keep the copy fields in sync when the studio data refreshes, unless being edited
@@ -75,7 +79,7 @@ export default function Website({ data, refresh }) {
     form.append('image', file);
     try {
       await api.uploadSiteImage(form, setProgress);
-      toast(target === 'hero' ? 'Hero photo updated' : 'Portrait updated');
+      toast(LABELS[target] ? `${LABELS[target]} updated` : 'Image updated');
       await refresh();
     } catch (err) {
       toast(err.message, 'error');
@@ -87,7 +91,7 @@ export default function Website({ data, refresh }) {
   };
 
   const reset = async (target) => {
-    if (!window.confirm('Go back to the original photo? Your uploaded image will be removed.')) return;
+    if (!window.confirm(`Go back to the original ${LABELS[target] || 'image'}? Your uploaded image will be removed.`)) return;
     try {
       await api.resetSiteImage(target);
       setPreview((p) => ({ ...p, [target]: null }));
@@ -125,8 +129,12 @@ export default function Website({ data, refresh }) {
 
   const heroSrc = preview.hero || s.heroImage;
   const portraitSrc = preview.portrait || s.portraitImage;
+  const logoSrc = preview.logo || s.logoImage;
+  const faviconSrc = preview.favicon || s.faviconImage;
   const heroIsCustom = String(s.heroImage).startsWith('/uploads/');
   const portraitIsCustom = String(s.portraitImage).startsWith('/uploads/');
+  const logoIsCustom = String(s.logoImage).startsWith('/uploads/');
+  const faviconIsCustom = String(s.faviconImage).startsWith('/uploads/');
 
   return (
     <>
@@ -135,9 +143,14 @@ export default function Website({ data, refresh }) {
           <h1>Website</h1>
           <p>The first thing fans see. Upload a new photo and the homepage changes the moment it finishes.</p>
         </div>
-        <a className="btn btn--ghost btn--sm" href="/" target="_blank" rel="noreferrer">
-          <Icon name="external" size={14} /> See it live
-        </a>
+        <div className="website__top-actions">
+          <Link className="btn btn--ghost btn--sm" to="/studio/media">
+            <Icon name="image" size={14} /> Change any picture
+          </Link>
+          <a className="btn btn--ghost btn--sm" href="/" target="_blank" rel="noreferrer">
+            <Icon name="external" size={14} /> See it live
+          </a>
+        </div>
       </div>
 
       <div className="panel">
@@ -290,6 +303,75 @@ export default function Website({ data, refresh }) {
               Tip: a photo where you’re looking slightly away from the camera reads best at this size.
             </p>
           </div>
+        </div>
+      </div>
+
+      <div className="panel">
+        <div className="panel__head">
+          <div>
+            <h3>Logo & browser icon</h3>
+            <p>Swap them as often as you like — every page updates immediately, no redeploy.</p>
+          </div>
+          <span className="badge-status badge-status--live">Live everywhere</span>
+        </div>
+        <div className="branding-grid">
+          <div className="branding-card">
+            <span className="field__hint">Logo / brand mark</span>
+            <div className="branding-card__preview">
+              {logoSrc ? (
+                <img src={logoSrc} alt="Current logo" className="branding-card__logo" />
+              ) : (
+                <span className="branding-card__monogram">{initials(s.artistName) || 'YS'}</span>
+              )}
+            </div>
+            <p className="field__hint">
+              {logoIsCustom ? 'Your uploaded logo is shown in the header, footer and studio.' : 'No logo yet — the monogram from your artist name is used.'}
+            </p>
+            <ImageDrop
+              id="logo-upload"
+              label={logoIsCustom ? 'Replace logo' : 'Upload logo'}
+              hint="PNG with a transparent background works best · up to 18MB"
+              onFile={(file) => upload('logo', file)}
+              busy={uploading === 'logo'}
+              progress={progress}
+            />
+            {logoIsCustom ? (
+              <button className="btn btn--ghost btn--sm" onClick={() => reset('logo')}>
+                <Icon name="close" size={13} /> Back to monogram
+              </button>
+            ) : null}
+          </div>
+
+          <div className="branding-card">
+            <span className="field__hint">Browser tab icon (favicon)</span>
+            <div className="branding-card__preview">
+              <img src={faviconSrc || '/favicon.svg'} alt="Current browser icon" className="branding-card__favicon" />
+            </div>
+            <p className="field__hint">
+              {faviconIsCustom ? 'Your uploaded icon appears in every visitor’s browser tab.' : 'The bundled YS icon is in use.'}
+            </p>
+            <ImageDrop
+              id="favicon-upload"
+              label={faviconIsCustom ? 'Replace icon' : 'Upload icon'}
+              hint="Square PNG or JPG · up to 18MB"
+              onFile={(file) => upload('favicon', file)}
+              busy={uploading === 'favicon'}
+              progress={progress}
+            />
+            {faviconIsCustom ? (
+              <button className="btn btn--ghost btn--sm" onClick={() => reset('favicon')}>
+                <Icon name="close" size={13} /> Use original icon
+              </button>
+            ) : null}
+          </div>
+        </div>
+        <div className="alert alert--info" style={{ marginTop: 18 }}>
+          <Icon name="image" size={16} />
+          <span>
+            Need to change a release cover, video thumbnail or merch photo? The{' '}
+            <Link to="/studio/media" className="link-arrow">Media tab</Link> lists every picture on the site in one
+            place.
+          </span>
         </div>
       </div>
     </>

@@ -56,7 +56,11 @@ export function clearSessionCookie(res) {
 }
 
 export function requireAdmin(req, res, next) {
-  if (readSession(req)) return next();
+  // Only an artist-role session opens the studio. Fan sessions use a different
+  // cookie and a different signature, but the role check keeps them separate
+  // even if a token is copied between cookies.
+  const session = readSession(req);
+  if (session?.role === 'artist') return next();
   return res.status(401).json({ error: 'Not signed in' });
 }
 

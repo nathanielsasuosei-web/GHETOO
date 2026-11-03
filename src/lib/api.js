@@ -84,6 +84,22 @@ export const api = {
   deleteSubscriber: (id) => del(`/api/admin/subscribers/${id}`),
   exportSubscribers: () => '/api/admin/subscribers/export',
 
+  // fan accounts
+  fanMe: () => get('/api/fans/me'),
+  registerFan: (payload) => post('/api/fans/register', payload),
+  loginFan: (payload) => post('/api/fans/login', payload),
+  logoutFan: () => post('/api/fans/logout'),
+  updateFan: (payload) => patch('/api/fans/me', payload),
+  changeFanPassword: (payload) => post('/api/fans/password', payload),
+  fanOrders: () => get('/api/fans/orders'),
+
+  // media library + fan accounts (studio)
+  mediaSlots: () => get('/api/admin/media'),
+  replaceMedia: (form, onProgress) => uploadWithProgress('/api/admin/media/replace', form, onProgress),
+  resetMedia: (kind, id) => del(`/api/admin/media/${encodeURIComponent(kind)}/${encodeURIComponent(id)}`),
+  listFans: () => get('/api/admin/fans'),
+  deleteFan: (id) => del(`/api/admin/fans/${encodeURIComponent(id)}`),
+
   me: () => get('/api/admin/me'),
   login: (password) => post('/api/admin/login', { password }),
   logout: () => post('/api/admin/logout'),

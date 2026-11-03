@@ -60,6 +60,7 @@ export function getState() {
   state.products ||= [];
   state.merchOrders ||= [];
   state.subscribers ||= [];
+  state.fans ||= [];
   return state;
 }
 

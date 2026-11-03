@@ -4,6 +4,7 @@ import Header from './Header';
 import Footer from './Footer';
 import Player from './Player';
 import SupportModal from './SupportModal';
+import AccountModal from './AccountModal';
 import { usePlayer } from '../context/PlayerContext';
 
 export default function Layout({ children }) {
@@ -25,6 +26,7 @@ export default function Layout({ children }) {
       {current ? <div className="player-spacer" /> : null}
       <Player />
       <SupportModal />
+      <AccountModal />
     </>
   );
 }

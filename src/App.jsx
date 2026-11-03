@@ -8,6 +8,7 @@ import Merch from './pages/Merch';
 import Support from './pages/Support';
 import About from './pages/About';
 import ThankYou from './pages/ThankYou';
+import Account from './pages/Account';
 import NotFound from './pages/NotFound';
 import Studio from './pages/Studio';
 import { useSite } from './context/SiteContext';
@@ -116,6 +117,14 @@ export default function App() {
         element={
           <Shell>
             <ThankYou />
+          </Shell>
+        }
+      />
+      <Route
+        path="/account"
+        element={
+          <Shell>
+            <Account />
           </Shell>
         }
       />
