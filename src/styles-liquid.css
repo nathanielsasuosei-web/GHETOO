@@ -1,0 +1,252 @@
+/* ==========================================================================
+   Liquid Glass — a selectable, site-wide visual finish.
+   Loaded after the V12 layer; all selectors are scoped to html.ys-liquid so
+   "Midnight Classic" keeps the original solid surfaces exactly as they were.
+   ========================================================================== */
+
+html.ys-liquid {
+  --lg-fill: rgba(var(--v12-surface-rgb), 0.44);
+  --lg-fill-strong: rgba(var(--v12-surface-rgb), 0.68);
+  --lg-wash: linear-gradient(
+    135deg,
+    rgba(var(--text-rgb), 0.09),
+    rgba(var(--v12-surface-rgb), 0.5) 42%,
+    rgba(var(--v12-surface-rgb), 0.3) 100%
+  );
+  --lg-edge: rgba(var(--text-rgb), 0.19);
+  --lg-edge-strong: rgba(var(--text-rgb), 0.3);
+  --lg-shadow: 0 28px 80px -42px rgba(0, 0, 0, 0.95),
+    inset 0 1px 0 rgba(var(--text-rgb), 0.13),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.18),
+    0 0 0 1px rgba(var(--glow-rgb), 0.035);
+  --lg-blur: blur(30px) saturate(178%);
+}
+
+html.ys-liquid body {
+  background:
+    radial-gradient(900px 620px at 88% -12%, rgba(var(--glow-rgb), 0.13), transparent 70%),
+    radial-gradient(820px 560px at 4% 12%, rgba(var(--gold-rgb), 0.1), transparent 72%),
+    linear-gradient(155deg, var(--v12-bg-hi) 0%, var(--v12-bg) 48%, var(--v12-bg-lo) 100%);
+}
+
+html.ys-liquid body::before {
+  opacity: 0.32;
+}
+
+html.ys-liquid body::after {
+  content: '';
+  position: fixed;
+  inset: -18vmax;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(28vmax 22vmax at 18% 24%, rgba(var(--gold-rgb), 0.16), transparent 72%),
+    radial-gradient(32vmax 24vmax at 78% 8%, rgba(var(--glow-rgb), 0.18), transparent 74%),
+    radial-gradient(26vmax 26vmax at 66% 88%, rgba(var(--gold-rgb), 0.1), transparent 70%),
+    radial-gradient(22vmax 18vmax at 8% 78%, rgba(var(--glow-rgb), 0.1), transparent 72%);
+  filter: blur(42px) saturate(160%);
+  opacity: 0.82;
+  animation: liquid-drift 30s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite alternate;
+}
+
+@keyframes liquid-drift {
+  0% { transform: translate3d(-3%, -2%, 0) scale(1); }
+  50% { transform: translate3d(4%, 3%, 0) scale(1.06); }
+  100% { transform: translate3d(-2%, 5%, 0) scale(1.02); }
+}
+
+@keyframes liquid-sheen {
+  from { background-position: 180% 0; }
+  to { background-position: -80% 0; }
+}
+
+html.ys-liquid main,
+html.ys-liquid .footer,
+html.ys-liquid .v12-studio,
+html.ys-liquid .loading-screen {
+  position: relative;
+  z-index: 1;
+}
+
+html.ys-liquid .header-wrap { z-index: 101; }
+
+/* The shared glass recipe. Colour variables keep every owner palette usable. */
+html.ys-liquid .v12-header,
+html.ys-liquid .header--solid,
+html.ys-liquid .v12-mega,
+html.ys-liquid .mobile-nav,
+html.ys-liquid .v12-topbar,
+html.ys-liquid .v12-rail,
+html.ys-liquid .v12-pulse,
+html.ys-liquid .v12-popover,
+html.ys-liquid .v12-command,
+html.ys-liquid .panel,
+html.ys-liquid .modal,
+html.ys-liquid .lightbox__panel,
+html.ys-liquid .hero__card,
+html.ys-liquid .support-panel,
+html.ys-liquid .support-panel__box,
+html.ys-liquid .spotlight,
+html.ys-liquid .track,
+html.ys-liquid .video-card,
+html.ys-liquid .product-card,
+html.ys-liquid .event-card,
+html.ys-liquid .wall__item,
+html.ys-liquid .account-card,
+html.ys-liquid .media-card,
+html.ys-liquid .theme-preview,
+html.ys-liquid .studio-login__card,
+html.ys-liquid .player,
+html.ys-liquid .toast,
+html.ys-liquid .notice-bar {
+  background: var(--lg-wash);
+  border-color: var(--lg-edge);
+  box-shadow: var(--lg-shadow);
+  -webkit-backdrop-filter: var(--lg-blur);
+  backdrop-filter: var(--lg-blur);
+}
+
+html.ys-liquid .v12-header,
+html.ys-liquid .header--solid {
+  background: linear-gradient(135deg, rgba(var(--text-rgb), 0.06), rgba(var(--ink-rgb), 0.48) 54%, rgba(var(--v12-surface-rgb), 0.34));
+}
+
+/* No overflow clipping here: the Explore mega-menu extends beyond the header. */
+html.ys-liquid .v12-header {
+  border-radius: 24px;
+}
+
+html.ys-liquid .v12-mega__inner {
+  background:
+    radial-gradient(420px 260px at 0% 0%, rgba(var(--gold-rgb), 0.18), transparent 70%),
+    linear-gradient(145deg, rgba(var(--text-rgb), 0.06), rgba(var(--v12-surface-rgb), 0.74) 55%, rgba(var(--v12-surface-rgb), 0.56));
+  -webkit-backdrop-filter: var(--lg-blur);
+  backdrop-filter: var(--lg-blur);
+}
+
+html.ys-liquid .v12-header::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(105deg, transparent 12%, rgba(255, 255, 255, 0.13) 22%, transparent 34%);
+  background-size: 240% 100%;
+  mix-blend-mode: screen;
+  opacity: 0.55;
+  animation: liquid-sheen 10s linear infinite;
+}
+
+html.ys-liquid .modal-backdrop {
+  background: rgba(var(--ink-rgb), 0.66);
+  -webkit-backdrop-filter: blur(18px) saturate(145%);
+  backdrop-filter: blur(18px) saturate(145%);
+}
+
+html.ys-liquid .modal,
+html.ys-liquid .lightbox__panel,
+html.ys-liquid .studio-login__card {
+  background: linear-gradient(145deg, rgba(var(--text-rgb), 0.08), rgba(var(--v12-surface-rgb), 0.76) 46%, rgba(var(--v12-surface-rgb), 0.56));
+}
+
+html.ys-liquid .btn--gold {
+  border: 1px solid rgba(var(--text-rgb), 0.18);
+  background:
+    linear-gradient(120deg, rgba(255, 255, 255, 0.32), transparent 26%, rgba(255, 255, 255, 0.08) 82%),
+    linear-gradient(135deg, var(--v12-gold-soft), var(--v12-gold) 58%, var(--gold-deep));
+  box-shadow:
+    0 18px 42px -22px rgba(var(--gold-rgb), 0.95),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.16);
+}
+
+html.ys-liquid .btn--ghost,
+html.ys-liquid .icon-btn,
+html.ys-liquid .chip,
+html.ys-liquid .amounts button,
+html.ys-liquid .method,
+html.ys-liquid .network,
+html.ys-liquid .size-picker button,
+html.ys-liquid .copy-row,
+html.ys-liquid .fixed-price,
+html.ys-liquid .support-panel__note,
+html.ys-liquid .goal,
+html.ys-liquid .theme-field__hex,
+html.ys-liquid .field input,
+html.ys-liquid .field textarea,
+html.ys-liquid .field select {
+  background: rgba(var(--v12-surface-rgb), 0.38);
+  border-color: var(--lg-edge);
+  box-shadow: inset 0 1px 0 rgba(var(--text-rgb), 0.07);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  backdrop-filter: blur(16px) saturate(150%);
+}
+
+html.ys-liquid .btn--ghost:hover,
+html.ys-liquid .icon-btn:hover,
+html.ys-liquid .amounts button:hover,
+html.ys-liquid .method:hover,
+html.ys-liquid .network:hover {
+  background: rgba(var(--gold-rgb), 0.11);
+  border-color: rgba(var(--gold-rgb), 0.46);
+}
+
+html.ys-liquid .brand__mark,
+html.ys-liquid .v12-avatar,
+html.ys-liquid .account-avatar,
+html.ys-liquid .media-intro__icon {
+  border: 1px solid rgba(var(--text-rgb), 0.22);
+  box-shadow:
+    0 10px 30px -14px rgba(var(--gold-rgb), 0.9),
+    inset 0 1px 0 rgba(255, 255, 255, 0.38),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.18);
+}
+
+html.ys-liquid .eyebrow,
+html.ys-liquid .link-arrow:hover {
+  text-shadow: 0 0 22px rgba(var(--gold-rgb), 0.35);
+}
+
+html.ys-liquid :focus-visible {
+  outline-color: var(--v12-gold-soft);
+  box-shadow: 0 0 0 4px rgba(var(--gold-rgb), 0.16);
+}
+
+html.ys-liquid .theme-preview--liquid {
+  border-color: rgba(var(--text-rgb), 0.28);
+  background:
+    radial-gradient(240px 180px at 80% 4%, rgba(var(--glow-rgb), 0.34), transparent 74%),
+    radial-gradient(220px 180px at 5% 90%, rgba(var(--gold-rgb), 0.2), transparent 70%),
+    linear-gradient(145deg, rgba(var(--text-rgb), 0.07), rgba(var(--v12-surface-rgb), 0.68));
+}
+
+html.ys-liquid .theme-preview--liquid .theme-preview__bar,
+html.ys-liquid .theme-preview--liquid .theme-preview__card {
+  -webkit-backdrop-filter: blur(18px) saturate(170%);
+  backdrop-filter: blur(18px) saturate(170%);
+  border-color: rgba(var(--text-rgb), 0.22);
+}
+
+/* Browsers without backdrop-filter still get a readable, layered material. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  html.ys-liquid {
+    --lg-fill: rgba(var(--v12-surface-rgb), 0.92);
+    --lg-fill-strong: rgba(var(--v12-surface-rgb), 0.98);
+    --lg-wash: linear-gradient(135deg, rgba(var(--text-rgb), 0.05), rgba(var(--v12-surface-rgb), 0.96));
+  }
+}
+
+@media (prefers-contrast: more) {
+  html.ys-liquid {
+    --lg-wash: linear-gradient(135deg, rgba(var(--text-rgb), 0.04), rgba(var(--v12-surface-rgb), 0.88));
+    --lg-blur: blur(10px) saturate(120%);
+  }
+  html.ys-liquid body::after { opacity: 0.25; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.ys-liquid body::after,
+  html.ys-liquid .v12-header::after {
+    animation: none;
+  }
+}

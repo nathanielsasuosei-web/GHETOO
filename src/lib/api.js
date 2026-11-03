@@ -84,6 +84,13 @@ export const api = {
   deleteSubscriber: (id) => del(`/api/admin/subscribers/${id}`),
   exportSubscribers: () => '/api/admin/subscribers/export',
 
+  // fan accounts
+  fanMe: () => get('/api/fans/me'),
+  fanRegister: (payload) => post('/api/fans/register', payload),
+  fanLogin: (payload) => post('/api/fans/login', payload),
+  fanLogout: () => post('/api/fans/logout'),
+  fanUpdate: (payload) => patch('/api/fans/me', payload),
+
   me: () => get('/api/admin/me'),
   login: (password) => post('/api/admin/login', { password }),
   logout: () => post('/api/admin/logout'),
@@ -91,6 +98,12 @@ export const api = {
   saveSettings: (payload) => patch('/api/admin/settings', payload),
   uploadSiteImage: (form, onProgress) => uploadWithProgress('/api/admin/site-images', form, onProgress),
   resetSiteImage: (target) => del(`/api/admin/site-images/${target}`),
+  replaceMedia: (kind, itemId, form, onProgress) =>
+    uploadWithProgress(
+      `/api/admin/media/${encodeURIComponent(kind)}/${encodeURIComponent(itemId)}`,
+      form,
+      onProgress
+    ),
 
   createTrack: (form, onProgress) => uploadWithProgress('/api/admin/tracks', form, onProgress),
   updateTrack: (id, payload) => patch(`/api/admin/tracks/${id}`, payload),

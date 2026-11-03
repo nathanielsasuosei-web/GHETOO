@@ -23,6 +23,8 @@ export function verifySession(token) {
   if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) return null;
   try {
     const data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    // A signed fan/account token must never be replayed as a studio session.
+    if (data.role !== 'artist') return null;
     if (!data.exp || data.exp < Date.now()) return null;
     return data;
   } catch {

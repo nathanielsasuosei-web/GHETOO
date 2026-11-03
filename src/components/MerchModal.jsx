@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Icon from './Icon';
 import { useSite } from '../context/SiteContext';
+import { useFan } from '../context/FanContext';
 import { api } from '../lib/api';
 import { cedis } from '../lib/format';
 
@@ -25,7 +26,7 @@ function CopyRow({ label, value }) {
   return (
     <div className="copy-row">
       <div>
-        <div style={{ fontSize: 9.5, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--muted-2)' }}>
+        <div style={{ fontSize: 'calc(9.5px * var(--ys-font-scale))', letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--muted-2)' }}>
           {label}
         </div>
         <code>{value}</code>
@@ -39,6 +40,7 @@ function CopyRow({ label, value }) {
 
 export default function MerchModal({ product, onClose }) {
   const { site } = useSite();
+  const { fan, refresh: refreshFan } = useFan();
   const [step, setStep] = useState('form');
   const [size, setSize] = useState(product?.sizes?.[0] || '');
   const [qty, setQty] = useState(1);
@@ -57,14 +59,22 @@ export default function MerchModal({ product, onClose }) {
   const momoNumber = site.settings.momo?.[provider] || '';
 
   useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     const onKey = (e) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
     return () => {
-      document.body.style.overflow = '';
+      document.body.style.overflow = previousOverflow;
       window.removeEventListener('keydown', onKey);
     };
   }, [onClose]);
+
+  useEffect(() => {
+    if (!fan) return;
+    setName(fan.name || '');
+    setEmail(fan.email || '');
+    setPhone(fan.phone || '');
+  }, [fan?.name, fan?.email, fan?.phone]);
 
   useEffect(() => {
     if (step !== 'pending' || !order?.reference) return;
@@ -124,6 +134,7 @@ export default function MerchModal({ product, onClose }) {
         window.location.href = result.authorizationUrl;
         return;
       }
+      if (fan) refreshFan().catch(() => {});
       setOrder(result.order || null);
       setMomo(result.momo || null);
       setStep(result.status === 'paid' ? 'paid' : 'pending');
@@ -246,6 +257,12 @@ export default function MerchModal({ product, onClose }) {
                 </div>
               </div>
 
+              {fan ? (
+                <div className="fan-prefill">
+                  <span><Icon name="user" size={14} /> Signed in as {fan.name} — your details were filled in.</span>
+                </div>
+              ) : null}
+
               <div className="merch-total">
                 <span>Total ({qty} item{qty > 1 ? 's' : ''})</span>
                 <strong>{cedis(total)}</strong>
@@ -281,7 +298,7 @@ export default function MerchModal({ product, onClose }) {
               </button>
             </div>
             <div className="modal__body pay">
-              <div className="pay__label mono" style={{ fontSize: 10, letterSpacing: '0.2em', color: 'var(--muted)' }}>
+              <div className="pay__label mono" style={{ fontSize: 'calc(10px * var(--ys-font-scale))', letterSpacing: '0.2em', color: 'var(--muted)' }}>
                 AMOUNT TO SEND
               </div>
               <div className="pay__amount">{cedis(order?.amount || total)}</div>
@@ -350,7 +367,7 @@ export default function MerchModal({ product, onClose }) {
               <div className="success-ring">
                 <Icon name="check" size={30} strokeWidth={2} />
               </div>
-              <p style={{ color: 'var(--ivory-dim)', fontSize: 14.5, lineHeight: 1.7 }}>
+              <p style={{ color: 'var(--ivory-dim)', fontSize: 'calc(14.5px * var(--ys-font-scale))', lineHeight: 1.7 }}>
                 {cedis(order?.amount || total)} received for {order?.items?.map((i) => `${i.title}${i.size ? ` (${i.size})` : ''} ×${i.qty}`).join(', ')}.
                 We’ll call {order?.phone || 'your number'} to arrange delivery.
               </p>

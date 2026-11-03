@@ -15,3 +15,18 @@ export function supportPresets(minimum) {
   const floor = supportMinimum(minimum);
   return [1, 2, 5, 10].map((factor) => floor * factor).filter((value) => value <= MAX_SUPPORT_PESEWAS);
 }
+
+/** `false` means the artist has chosen one exact price instead of a floor. */
+export function allowsCustomSupport(value) {
+  return value !== false;
+}
+
+export function supportChoices(minimum, allowCustom = true) {
+  const floor = supportMinimum(minimum);
+  return allowsCustomSupport(allowCustom) ? supportPresets(floor) : [floor];
+}
+
+/** Prefix used beside a price: "from GH₵ 5" for tips, "GH₵ 5" for a fixed price. */
+export function supportPricePrefix(allowCustom = true) {
+  return allowsCustomSupport(allowCustom) ? 'from ' : '';
+}

@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 import { MUSIC_PLATFORMS, normalizeStreamingUrl, safeStreamingUrl, videoYouTubeUrl } from '../src/lib/streaming.js';
 import { MIN_SUPPORT_PESEWAS, MAX_SUPPORT_PESEWAS, isValidSupportMinimum, supportMinimum } from '../src/lib/support.js';
 import { sanitizeTheme } from '../src/lib/theme.js';
+import { isValidFontScale } from '../src/lib/typography.js';
 import { getState, save, saveNow, UPLOAD_DIR, DATA_DIR, id, reference } from './db.js';
 import {
   createSession,
@@ -17,6 +18,16 @@ import {
   throttleLogin,
   resetLoginThrottle,
 } from './auth.js';
+import {
+  createFanSession,
+  clearFanCookie,
+  FAN_DUMMY_PASSWORD_HASH,
+  hashFanPassword,
+  publicFan,
+  readFanSession,
+  setFanCookie,
+  verifyFanPassword,
+} from './fanAuth.js';
 import { sendMedia, extFor, safeJoin } from './media.js';
 import {
   paymentMode,
@@ -77,7 +88,10 @@ app.use((req, res, next) => {
 // ---------------------------------------------------------------- helpers
 const PESEWA_MIN = MIN_SUPPORT_PESEWAS; // GHS 1.00
 const PESEWA_MAX = MAX_SUPPORT_PESEWAS; // GHS 50,000
+const VISUAL_STYLES = ['liquid', 'classic'];
+const IMAGE_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 const emailOk = (v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v);
+const strictEmailOk = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v);
 const clampText = (v, max) => String(v ?? '').trim().slice(0, max);
 const toPesewas = (v) => {
   const n = Math.round(Number(v));
@@ -146,6 +160,7 @@ function publicTrack(t) {
     duration: t.duration,
     // Keep the old response field for clients, but use the artist's global minimum.
     minAmount: supportMinimum(getState().settings.minSupport),
+    fixedPrice: getState().settings.allowCustomSupport === false,
     plays: t.plays,
     downloads: t.downloads,
     featured: Boolean(t.featured),
@@ -214,6 +229,7 @@ function publicVideo(v) {
     duration: v.duration,
     views: v.views,
     featured: Boolean(v.featured),
+    fixedPrice: getState().settings.allowCustomSupport === false,
     createdAt: v.createdAt,
     youtubeUrl: videoYouTubeUrl(v),
     src: v.source === 'url' ? v.src : `/api/video/${v.id}`,
@@ -282,6 +298,15 @@ function getTrack(state, key) {
   return state.tracks.find((t) => t.id === key || t.slug === key);
 }
 
+/** Signed-in fan for this request, with session-version invalidation. */
+function currentFan(req) {
+  const session = readFanSession(req);
+  if (!session) return null;
+  const fan = getState().fans.find((entry) => entry.id === session.sub);
+  if (!fan || (fan.sessionVersion || 0) !== (session.ver || 0)) return null;
+  return fan;
+}
+
 function markPaid(order, extra = {}) {
   order.status = 'paid';
   order.confirmedAt = new Date().toISOString();
@@ -344,20 +369,47 @@ const siteUpload = multer({
       cb(null, path.join(UPLOAD_DIR, 'site'));
     },
     filename(req, file, cb) {
-      const target = req.body?.target === 'portrait' ? 'portrait' : 'hero';
+      const requested = String(req.body?.target || 'hero');
+      const target = ['hero', 'portrait', 'logo'].includes(requested) ? requested : 'hero';
       cb(null, `${target}-${Date.now()}-${crypto.randomBytes(3).toString('hex')}${extFor(file.mimetype, file.originalname) || '.jpg'}`);
     },
   }),
   limits: { fileSize: 18 * 1024 * 1024, files: 1 },
   fileFilter(req, file, cb) {
-    if (file.mimetype.startsWith('image/')) return cb(null, true);
-    cb(new Error('Please choose a JPG, PNG or WebP image.'));
+    if (IMAGE_MIME_TYPES.has(file.mimetype)) return cb(null, true);
+    cb(new Error('Please choose a JPG, PNG, WebP or GIF image.'));
+  },
+});
+
+const MEDIA_ASSET_KINDS = {
+  track: { collection: 'tracks', field: 'cover', dir: 'covers', prefix: 'cover' },
+  video: { collection: 'videos', field: 'thumb', dir: 'thumbs', prefix: 'thumb' },
+  product: { collection: 'products', field: 'image', dir: 'products', prefix: 'product' },
+};
+
+const assetUpload = multer({
+  storage: multer.diskStorage({
+    destination(req, file, cb) {
+      const dir = MEDIA_ASSET_KINDS[req.params.kind]?.dir || 'site';
+      cb(null, path.join(UPLOAD_DIR, dir));
+    },
+    filename(req, file, cb) {
+      const kind = MEDIA_ASSET_KINDS[req.params.kind]?.prefix || 'image';
+      const safeId = slugify(req.params.id).slice(0, 32);
+      cb(null, `${kind}-${safeId}-${Date.now()}-${crypto.randomBytes(3).toString('hex')}${extFor(file.mimetype, file.originalname) || '.jpg'}`);
+    },
+  }),
+  limits: { fileSize: 18 * 1024 * 1024, files: 1 },
+  fileFilter(req, file, cb) {
+    if (IMAGE_MIME_TYPES.has(file.mimetype)) return cb(null, true);
+    cb(new Error('Please choose a JPG, PNG, WebP or GIF image.'));
   },
 });
 
 const SITE_IMAGE_TARGETS = {
   hero: { field: 'heroImage', fallback: '/media/hero.jpg', label: 'Homepage hero' },
   portrait: { field: 'portraitImage', fallback: '/media/portrait.jpg', label: 'Portrait photo' },
+  logo: { field: 'logoImage', fallback: '/media/logo.svg', label: 'Logo' },
 };
 
 /** Only delete files the artist uploaded — never the artwork bundled in /media. */
@@ -437,7 +489,104 @@ app.get('/api/site', (req, res) => {
     momoProviders: MOMO_PROVIDERS,
     minSupport: supportMinimum(state.settings.minSupport),
     maxSupport: PESEWA_MAX,
+    allowCustomSupport: state.settings.allowCustomSupport !== false,
   });
+});
+
+// ---------------------------------------------------------------- fan accounts
+app.post('/api/fans/register', async (req, res) => {
+  if (!rateLimit(`fan-register:${req.ip}`, 8, 60 * 60 * 1000)) {
+    return res.status(429).json({ error: 'Too many sign-ups from here. Please try again later.' });
+  }
+  const body = req.body || {};
+  const name = clampText(body.name, 80);
+  const email = clampText(body.email, 160).toLowerCase();
+  const password = typeof body.password === 'string' ? body.password : '';
+  if (name.length < 2) return res.status(400).json({ error: 'Add the name you want us to use.' });
+  if (!strictEmailOk(email)) return res.status(400).json({ error: 'Enter a valid email address.' });
+  if (password.length < 8 || password.length > 128) {
+    return res.status(400).json({ error: 'Use a password between 8 and 128 characters.' });
+  }
+  const state = getState();
+  if (state.fans.some((fan) => fan.email === email)) {
+    return res.status(409).json({ error: 'An account with that email already exists. Try signing in.' });
+  }
+  const now = new Date().toISOString();
+  const fan = {
+    id: id('fan_'),
+    name,
+    email,
+    phone: '',
+    passwordHash: await hashFanPassword(password),
+    sessionVersion: 0,
+    createdAt: now,
+    lastLoginAt: now,
+  };
+  state.fans.push(fan);
+  saveNow();
+  setFanCookie(res, createFanSession(fan.id, fan.sessionVersion));
+  res.status(201).json({ fan: publicFan(fan) });
+});
+
+app.post('/api/fans/login', async (req, res) => {
+  if (!rateLimit(`fan-login:${req.ip}`, 20, 15 * 60 * 1000)) {
+    return res.status(429).json({ error: 'Too many sign-in attempts. Please wait a few minutes.' });
+  }
+  const body = req.body || {};
+  const email = clampText(body.email, 160).toLowerCase();
+  const password = typeof body.password === 'string' ? body.password : '';
+  const state = getState();
+  const fan = state.fans.find((entry) => entry.email === email);
+  const candidateHash = fan?.passwordHash || FAN_DUMMY_PASSWORD_HASH;
+  const passwordOk = password.length <= 128 && await verifyFanPassword(password, candidateHash);
+  if (!fan || !passwordOk) return res.status(401).json({ error: 'Email or password is incorrect.' });
+  fan.lastLoginAt = new Date().toISOString();
+  saveNow();
+  setFanCookie(res, createFanSession(fan.id, fan.sessionVersion || 0));
+  res.json({ fan: publicFan(fan) });
+});
+
+app.post('/api/fans/logout', (req, res) => {
+  const fan = currentFan(req);
+  if (fan) {
+    // Invalidate every copy of the old stateless token, not just this browser.
+    fan.sessionVersion = (fan.sessionVersion || 0) + 1;
+    saveNow();
+  }
+  clearFanCookie(res);
+  res.json({ ok: true });
+});
+
+app.get('/api/fans/me', (req, res) => {
+  const fan = currentFan(req);
+  res.setHeader('Cache-Control', 'no-store');
+  if (!fan) return res.json({ fan: null, orders: [], merchOrders: [] });
+  const state = getState();
+  const orders = state.orders
+    .filter((order) => order.fanId === fan.id)
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .slice(0, 50)
+    .map(publicOrder);
+  const merchOrders = state.merchOrders
+    .filter((order) => order.fanId === fan.id)
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .slice(0, 50)
+    .map(publicMerchOrder);
+  res.json({ fan: publicFan(fan), orders, merchOrders });
+});
+
+app.patch('/api/fans/me', (req, res) => {
+  const fan = currentFan(req);
+  if (!fan) return res.status(401).json({ error: 'Sign in to update your account.' });
+  const body = req.body || {};
+  if (body.name !== undefined) {
+    const name = clampText(body.name, 80);
+    if (name.length < 2) return res.status(400).json({ error: 'Add the name you want us to use.' });
+    fan.name = name;
+  }
+  if (body.phone !== undefined) fan.phone = clampText(body.phone, 30);
+  saveNow();
+  res.json({ fan: publicFan(fan) });
 });
 
 app.get('/api/tracks/:key', (req, res) => {
@@ -503,8 +652,12 @@ app.post('/api/orders', async (req, res) => {
 
   const amount = Number(body.amount);
   const floor = supportMinimum(state.settings.minSupport);
+  const allowCustom = state.settings.allowCustomSupport !== false;
   if (!Number.isSafeInteger(amount) || amount < floor) {
     return res.status(400).json({ error: `Minimum support is GH₵${(floor / 100).toFixed(2)}.` });
+  }
+  if (!allowCustom && amount !== floor) {
+    return res.status(400).json({ error: `The artist has set one support price: GH₵${(floor / 100).toFixed(2)}.` });
   }
   if (amount > PESEWA_MAX) return res.status(400).json({ error: 'That amount is too large for checkout.' });
 
@@ -528,6 +681,7 @@ app.post('/api/orders', async (req, res) => {
   const order = {
     id: id('ord_'),
     reference: reference(),
+    fanId: currentFan(req)?.id || null,
     trackId: track?.id || null,
     videoId: video?.id || null,
     videoTitle: video?.title || null,
@@ -742,6 +896,7 @@ app.post('/api/merch-orders', async (req, res) => {
   const order = {
     id: id('mord_'),
     reference: reference(),
+    fanId: currentFan(req)?.id || null,
     kind: 'merch',
     items,
     amount,
@@ -900,6 +1055,7 @@ app.get('/api/admin/overview', (req, res) => {
     merchOrders: state.merchOrders.slice().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
     subscribers: state.subscribers,
     merchStats,
+    fanCount: state.fans.length,
     stats,
     series,
     byMethod,
@@ -916,6 +1072,15 @@ app.patch('/api/admin/settings', (req, res) => {
       error: `Set a minimum between GH₵${(PESEWA_MIN / 100).toFixed(2)} and GH₵${(PESEWA_MAX / 100).toFixed(2)}.`,
     });
   }
+  if (body.allowCustomSupport !== undefined && typeof body.allowCustomSupport !== 'boolean') {
+    return res.status(400).json({ error: 'The flexible-support setting must be true or false.' });
+  }
+  if (body.visualStyle !== undefined && !VISUAL_STYLES.includes(body.visualStyle)) {
+    return res.status(400).json({ error: 'Choose either liquid or classic appearance.' });
+  }
+  if (body.fontScale !== undefined && !isValidFontScale(body.fontScale)) {
+    return res.status(400).json({ error: 'Choose a font size from 90% to 125%.' });
+  }
   const allowed = [
     'artistName',
     'tagline',
@@ -925,9 +1090,13 @@ app.patch('/api/admin/settings', (req, res) => {
     'currency',
     'heroImage',
     'portraitImage',
+    'logoImage',
     'heroFocus',
     'supportNote',
     'minSupport',
+    'allowCustomSupport',
+    'visualStyle',
+    'fontScale',
     'announcement',
     'cardEnabled',
     'goalAmount',
@@ -937,6 +1106,10 @@ app.patch('/api/admin/settings', (req, res) => {
   for (const key of allowed) {
     if (body[key] !== undefined) state.settings[key] = body[key];
   }
+  const now = new Date().toISOString();
+  if (body.visualStyle !== undefined || body.fontScale !== undefined) state.settings.styleUpdatedAt = now;
+  if (body.fontScale !== undefined) state.settings.fontScaleUpdatedAt = now;
+  if (Object.keys(body).length) state.settings.siteUpdatedAt = now;
   if (body.theme !== undefined) {
     try {
       state.settings.theme = { ...(state.settings.theme || {}), ...sanitizeTheme(body.theme) };
@@ -963,7 +1136,8 @@ app.post('/api/admin/site-images', siteUpload.single('image'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No image uploaded.' });
   removeUploadedSiteImage(state.settings[meta.field]);
   state.settings[meta.field] = uploadedUrl(req.file);
-  state.settings.heroUpdatedAt = new Date().toISOString();
+  state.settings.siteImagesUpdatedAt = new Date().toISOString();
+  if (target === 'hero') state.settings.heroUpdatedAt = state.settings.siteImagesUpdatedAt;
   saveNow();
   res.json({ settings: state.settings, target, url: state.settings[meta.field] });
 });
@@ -974,8 +1148,28 @@ app.delete('/api/admin/site-images/:target', (req, res) => {
   if (!meta) return res.status(400).json({ error: 'Unknown image.' });
   removeUploadedSiteImage(state.settings[meta.field]);
   state.settings[meta.field] = meta.fallback;
+  state.settings.siteImagesUpdatedAt = new Date().toISOString();
   saveNow();
   res.json({ settings: state.settings, target: req.params.target, url: meta.fallback });
+});
+
+// Replace any catalogue picture from Studio → Media. Bundled /media artwork is
+// preserved; only a previous /uploads replacement is deleted.
+app.post('/api/admin/media/:kind/:id', assetUpload.single('image'), (req, res) => {
+  const meta = MEDIA_ASSET_KINDS[req.params.kind];
+  const state = getState();
+  const item = meta ? state[meta.collection].find((entry) => entry.id === req.params.id) : null;
+  if (!meta || !item || !req.file) {
+    if (req.file) discardUploads({ image: [req.file] });
+    return res.status(!meta ? 400 : item ? 400 : 404).json({
+      error: !meta ? 'Unknown image type.' : item ? 'No image uploaded.' : 'That item no longer exists.',
+    });
+  }
+  const previous = item[meta.field];
+  if (typeof previous === 'string' && previous.startsWith(`/uploads/${meta.dir}/`)) removeMedia(previous);
+  item[meta.field] = uploadedUrl(req.file);
+  saveNow();
+  res.json({ kind: req.params.kind, id: item.id, url: item[meta.field] });
 });
 
 // ---- tracks
@@ -1389,10 +1583,29 @@ app.use('/uploads/site', express.static(path.join(UPLOAD_DIR, 'site'), { maxAge:
 app.use('/uploads/products', express.static(path.join(UPLOAD_DIR, 'products'), { maxAge: '7d', fallthrough: true }));
 
 if (fs.existsSync(DIST)) {
+  const CLIENT_ROUTES = [
+    '/',
+    '/music',
+    '/videos',
+    '/events',
+    '/merch',
+    '/support',
+    '/about',
+    '/account',
+    '/thank-you',
+    '/studio',
+  ];
+  const ASSET_PREFIXES = ['/assets/', '/media/', '/uploads/'];
   app.use(express.static(DIST, { index: false, maxAge: '1h' }));
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api/')) return next();
-    res.sendFile(path.join(DIST, 'index.html'));
+    if (ASSET_PREFIXES.some((prefix) => req.path.startsWith(prefix))) return res.sendStatus(404);
+    const pathname = req.path.replace(/\/+$/, '') || '/';
+    const known = CLIENT_ROUTES.some(
+      (route) => pathname === route || (route !== '/' && pathname.startsWith(`${route}/`))
+    );
+    res.status(known ? 200 : 404);
+    return res.sendFile(path.join(DIST, 'index.html'));
   });
 } else {
   app.get('/', (req, res) =>
@@ -1406,7 +1619,7 @@ if (fs.existsSync(DIST)) {
 app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {
     const messages = {
-      LIMIT_FILE_SIZE: 'That file is too large. Audio max 800MB, video max 800MB.',
+      LIMIT_FILE_SIZE: 'That file is too large. Images max 18MB, audio and video max 800MB.',
     };
     return res.status(400).json({ error: messages[err.code] || err.message });
   }
@@ -1422,7 +1635,7 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`Young Silence · listening on http://0.0.0.0:${PORT}`);
   console.log(`Payments: ${paymentMode()} · Studio password: ${process.env.ARTIST_PASSWORD ? 'set via env' : 'youngsilence (default)'}`);
   console.log(
-    `${state.tracks.length} tracks · ${state.videos.length} videos · ${state.orders.length} support orders · ${state.events.length} events · ${state.products.length} products · ${state.subscribers.length} subscribers`
+    `${state.tracks.length} tracks · ${state.videos.length} videos · ${state.orders.length} support orders · ${state.events.length} events · ${state.products.length} products · ${state.subscribers.length} subscribers · ${state.fans.length} fan accounts`
   );
 });
 

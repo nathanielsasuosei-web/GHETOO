@@ -371,7 +371,7 @@ export default function Releases({ data, refresh, toast }) {
                       <img className="table__cover" src={track.cover} alt="" />
                       <div style={{ minWidth: 0 }}>
                         <strong>
-                          {track.title} {track.featured ? <span className="chip" style={{ fontSize: 9, padding: '1px 7px' }}>Featured</span> : null}
+                          {track.title} {track.featured ? <span className="chip" style={{ fontSize: 'calc(9px * var(--ys-font-scale))', padding: '1px 7px' }}>Featured</span> : null}
                         </strong>
                         <div className="sub">
                           {track.genre} · {track.year} · added {longDate(track.createdAt)}

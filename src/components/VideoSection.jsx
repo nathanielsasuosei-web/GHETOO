@@ -88,6 +88,7 @@ export default function VideoSection({ videos, title = 'Videos', intro, compactG
   const { site } = useSite();
   const { openSupport } = useSupport();
   const minimum = supportMinimum(site?.minSupport);
+  const globalFixedPrice = site?.allowCustomSupport === false;
   if (!videos?.length) return null;
 
   return (
@@ -95,6 +96,8 @@ export default function VideoSection({ videos, title = 'Videos', intro, compactG
       <div className="video-grid">
         {videos.slice(0, compactGrid ? 3 : videos.length).map((video) => {
           const youtubeUrl = safeStreamingUrl('youtubeUrl', video.youtubeUrl);
+          const fixedPrice = globalFixedPrice || video.fixedPrice === true;
+          const pricePhrase = fixedPrice ? `for ${cedis(minimum)}` : `from ${cedis(minimum)}`;
           return (
             <article key={video.id} className="video-item reveal">
               {youtubeUrl ? (
@@ -120,10 +123,10 @@ export default function VideoSection({ videos, title = 'Videos', intro, compactG
               <button
                 type="button"
                 className="video-card__support"
-                onClick={() => openSupport(null, { video })}
-                aria-label={`Support ${video.title} from ${cedis(minimum)}`}
+                onClick={() => openSupport(null, { video, amount: fixedPrice ? minimum : undefined })}
+                aria-label={`Support ${video.title} ${pricePhrase}`}
               >
-                <Icon name="heart" size={14} /> Support from {cedis(minimum)}
+                <Icon name="heart" size={14} /> Support {pricePhrase}
               </button>
             </article>
           );

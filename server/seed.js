@@ -19,7 +19,10 @@ Today his sound sits somewhere between Afrobeats and alté — Twi and Pidgin la
     heroImage: '/media/hero.jpg',
     portraitImage: '/media/portrait.jpg',
     heroFocus: 'center',
-    monogramImage: '/media/logo.png',
+    logoImage: '/media/logo.svg',
+    monogramImage: '/media/logo.svg',
+    visualStyle: 'liquid',
+    fontScale: 100,
     momo: {
       mtn: '024 000 0000',
       telecel: '',
@@ -30,6 +33,7 @@ Today his sound sits somewhere between Afrobeats and alté — Twi and Pidgin la
     supportNote:
       'Every cedi goes straight into studio time, mixing, videos and getting the music to more ears. Your support keeps the lights on.',
     minSupport: 100,
+    allowCustomSupport: true,
     socials: {
       instagram: 'https://instagram.com',
       tiktok: 'https://tiktok.com',
@@ -56,6 +60,7 @@ export function seedState() {
     version: 1,
     createdAt: new Date().toISOString(),
     settings: baseSettings(),
+    fans: [],
     tracks: [
       {
         id: 'trk_accra_nights',

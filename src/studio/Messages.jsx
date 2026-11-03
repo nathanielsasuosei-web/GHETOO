@@ -49,9 +49,9 @@ export default function Messages({ data, refresh, toast }) {
                   <div style={{ minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                       {!msg.read ? <span className="dot" style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--gold)' }} /> : null}
-                      <strong style={{ fontSize: 13.5 }}>{msg.subject}</strong>
+                      <strong style={{ fontSize: 'calc(13.5px * var(--ys-font-scale))' }}>{msg.subject}</strong>
                     </div>
-                    <div className="sub" style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 4 }}>
+                    <div className="sub" style={{ fontSize: 'calc(11.5px * var(--ys-font-scale))', color: 'var(--muted)', marginTop: 4 }}>
                       {msg.name} · {msg.email} · {relativeTime(msg.createdAt)}
                     </div>
                   </div>
@@ -66,7 +66,7 @@ export default function Messages({ data, refresh, toast }) {
                 <p
                   style={{
                     marginTop: 12,
-                    fontSize: 13.5,
+                    fontSize: 'calc(13.5px * var(--ys-font-scale))',
                     color: 'var(--ivory-dim)',
                     lineHeight: 1.7,
                     whiteSpace: 'pre-line',
@@ -78,7 +78,7 @@ export default function Messages({ data, refresh, toast }) {
                 >
                   {msg.body}
                 </p>
-                <div className="sub" style={{ fontSize: 10.5, color: 'var(--muted-2)', marginTop: 10 }}>
+                <div className="sub" style={{ fontSize: 'calc(10.5px * var(--ys-font-scale))', color: 'var(--muted-2)', marginTop: 10 }}>
                   {longDate(msg.createdAt)}
                 </div>
               </article>

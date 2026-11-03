@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import Icon from './Icon';
+import BrandLogo from './BrandLogo';
 import { useSite } from '../context/SiteContext';
 import { useSupport } from '../context/SupportContext';
+import { useFan } from '../context/FanContext';
 
 const links = [
   { to: '/music', label: 'Music', icon: 'music', blurb: 'Releases, lyrics and listening links' },
@@ -18,6 +20,7 @@ const primaryLinks = links.slice(0, 3);
 export default function Header() {
   const { site } = useSite();
   const { openSupport } = useSupport();
+  const { fan, openAuth } = useFan();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const [megaOpen, setMegaOpen] = useState(false);
@@ -92,8 +95,8 @@ export default function Header() {
 
       <header className={`header v12-header ${scrolled || open || megaOpen ? 'header--solid' : ''}`}>
         <div className="container header__inner">
-          <Link to="/" className="brand" aria-label="Young Silence — home">
-            <span className="brand__mark">YS</span>
+          <Link to="/" className="brand" aria-label={`${settings?.artistName || 'Young Silence'} — home`}>
+            <BrandLogo settings={settings} />
             <span className="brand__text">
               <span className="brand__name">{settings?.artistName || 'Young Silence'}</span>
             </span>
@@ -143,25 +146,6 @@ export default function Header() {
                 aria-hidden={!megaOpen}
               >
                 <nav className="v12-mega__inner" aria-label="Explore Young Silence">
-                  <div className="v12-mega__intro">
-                    <span className="v12-mega__eyebrow">
-                      <Icon name="sparkle" size={13} /> The full world
-                    </span>
-                    <h2>Go deeper into the music.</h2>
-                    <p>One independent universe: records, visuals, shows, merch and the people keeping it moving.</p>
-                    <button
-                      type="button"
-                      className="v12-mega__cta"
-                      onClick={() => {
-                        setMegaOpen(false);
-                        openSupport();
-                      }}
-                    >
-                      <Icon name="heart" size={15} /> Support the music
-                      <Icon name="arrowUpRight" size={14} />
-                    </button>
-                  </div>
-
                   <div className="v12-mega__grid">
                     {links.map((link) => (
                       <NavLink
@@ -187,6 +171,22 @@ export default function Header() {
           </nav>
 
           <div className="header__actions">
+            {fan ? (
+              <NavLink to="/account" className="btn btn--ghost btn--sm fan-account-link" aria-label="My fan account">
+                <Icon name="user" size={15} />
+                <span>My account</span>
+              </NavLink>
+            ) : (
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm fan-account-link"
+                onClick={() => openAuth('register')}
+                aria-label="Create a fan account"
+              >
+                <Icon name="user" size={15} />
+                <span>Join</span>
+              </button>
+            )}
             <button className="btn btn--gold btn--sm v12-header-cta" onClick={() => openSupport()}>
               <Icon name="heart" size={15} />
               Support the music
@@ -207,7 +207,7 @@ export default function Header() {
         <div className="mobile-nav v12-mobile-nav">
           <div className="v12-mobile-nav__head">
             <span className="eyebrow eyebrow--plain">Navigate V12</span>
-            <span>Young Silence</span>
+            <span>{settings?.artistName || 'Young Silence'}</span>
           </div>
           <div className="v12-mobile-nav__grid">
             {links.map((link) => (
@@ -223,6 +223,28 @@ export default function Header() {
               </Link>
             ))}
           </div>
+          {fan ? (
+            <Link
+              to="/account"
+              className="btn btn--ghost"
+              onClick={() => setOpen(false)}
+            >
+              <Icon name="user" size={16} />
+              My account
+            </Link>
+          ) : (
+            <button
+              type="button"
+              className="btn btn--ghost"
+              onClick={() => {
+                setOpen(false);
+                openAuth('register');
+              }}
+            >
+              <Icon name="user" size={16} />
+              Create account
+            </button>
+          )}
           <button
             className="btn btn--gold"
             onClick={() => {

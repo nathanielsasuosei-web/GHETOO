@@ -160,10 +160,10 @@ export default function Support() {
           <div className="about">
             <div className="reveal">
               <span className="eyebrow">Get in touch</span>
-              <h2 style={{ fontFamily: 'var(--serif)', fontSize: 'clamp(32px,4vw,48px)', margin: '14px 0 16px' }}>
+              <h2 style={{ fontFamily: 'var(--serif)', fontSize: 'clamp(calc(32px * var(--ys-font-scale)),4vw,calc(48px * var(--ys-font-scale)))', margin: '14px 0 16px' }}>
                 Bookings, press, or just to talk
               </h2>
-              <p style={{ color: 'var(--muted)', fontSize: 14.5, lineHeight: 1.75, maxWidth: '46ch' }}>
+              <p style={{ color: 'var(--muted)', fontSize: 'calc(14.5px * var(--ys-font-scale))', lineHeight: 1.75, maxWidth: '46ch' }}>
                 For shows, features and interviews, send a message. For anything about a payment, include your
                 reference (it looks like <span className="mono">YS-XXXXXX</span>).
               </p>
@@ -183,8 +183,8 @@ export default function Support() {
                   <div className="success-ring">
                     <Icon name="check" size={28} strokeWidth={2} />
                   </div>
-                  <h3 style={{ fontFamily: 'var(--serif)', fontSize: 26, marginBottom: 8 }}>Message sent</h3>
-                  <p style={{ color: 'var(--muted)', fontSize: 13.5 }}>
+                  <h3 style={{ fontFamily: 'var(--serif)', fontSize: 'calc(26px * var(--ys-font-scale))', marginBottom: 8 }}>Message sent</h3>
+                  <p style={{ color: 'var(--muted)', fontSize: 'calc(13.5px * var(--ys-font-scale))' }}>
                     It landed in the studio inbox. Expect a reply within a couple of days.
                   </p>
                   <button className="btn btn--ghost" style={{ marginTop: 18 }} onClick={() => setSent(false)}>

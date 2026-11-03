@@ -16,6 +16,24 @@ import {
   themeReport,
   themeVars,
 } from '../lib/theme';
+import {
+  VISUAL_STYLE_CHOICES,
+  applyVisualStyle,
+  normalizeVisualStyle,
+  resolveVisualStyle,
+  storeVisualStyle,
+} from '../lib/visualStyle';
+import {
+  DEFAULT_FONT_SCALE,
+  FONT_SCALE_CHOICES,
+  FONT_SCALE_MAX,
+  FONT_SCALE_MIN,
+  FONT_SCALE_STEP,
+  applyFontScale,
+  normalizeFontScale,
+  resolveFontScale,
+  storeFontScale,
+} from '../lib/typography';
 
 const pct = (ratio) => `${ratio.toFixed(1)}:1`;
 
@@ -28,9 +46,13 @@ function ContrastChip({ label, grade }) {
   );
 }
 
-function Preview({ theme }) {
+function Preview({ theme, style }) {
   return (
-    <div className="theme-preview" style={themeVars(theme)} aria-hidden="true">
+    <div
+      className={`theme-preview ${style === 'liquid' ? 'theme-preview--liquid' : ''}`}
+      style={themeVars(theme)}
+      aria-hidden="true"
+    >
       <div className="theme-preview__glow" />
       <div className="theme-preview__bar">
         <span className="theme-preview__mark">YS</span>
@@ -59,26 +81,59 @@ function Preview({ theme }) {
 
 export default function Appearance({ data, refresh, toast }) {
   const resolved = useMemo(() => resolveTheme(data.settings), [data.settings]);
+  const resolvedStyle = useMemo(() => resolveVisualStyle(data.settings), [data.settings]);
+  const resolvedFont = useMemo(() => resolveFontScale(data.settings), [data.settings]);
   const saved = resolved.theme;
+  const savedStyle = normalizeVisualStyle(resolvedStyle.style);
+  const savedFontScale = normalizeFontScale(resolvedFont.scale);
   const [draft, setDraft] = useState(saved);
+  const [style, setStyle] = useState(savedStyle);
+  const [fontScale, setFontScale] = useState(savedFontScale);
   const [typing, setTyping] = useState({});
   const [busy, setBusy] = useState(false);
   const savedRef = useRef(saved);
+  const savedStyleRef = useRef(savedStyle);
+  const savedFontScaleRef = useRef(savedFontScale);
   savedRef.current = saved;
+  savedStyleRef.current = savedStyle;
+  savedFontScaleRef.current = savedFontScale;
 
   useEffect(() => {
     setDraft(saved);
     setTyping({});
   }, [saved]);
 
+  useEffect(() => {
+    setStyle(savedStyle);
+  }, [savedStyle]);
+
+  useEffect(() => {
+    setFontScale(savedFontScale);
+  }, [savedFontScale]);
+
   // Live preview: the studio (and the public site behind it) recolours as you drag.
   useEffect(() => {
     applyTheme(draft);
   }, [draft]);
 
-  useEffect(() => () => applyTheme(savedRef.current), []);
+  useEffect(() => {
+    applyVisualStyle(style);
+  }, [style]);
 
-  const dirty = !themeMatches(draft, saved);
+  useEffect(() => {
+    applyFontScale(fontScale);
+  }, [fontScale]);
+
+  useEffect(
+    () => () => {
+      applyTheme(savedRef.current);
+      applyVisualStyle(savedStyleRef.current);
+      applyFontScale(savedFontScaleRef.current);
+    },
+    []
+  );
+
+  const dirty = !themeMatches(draft, saved) || style !== savedStyle || fontScale !== savedFontScale;
   // True when this browser is showing a palette the API has not stored yet.
   const deviceOnly = resolved.source === 'device' && !themeMatches(saved, data.settings.theme);
   const report = themeReport(draft);
@@ -109,16 +164,20 @@ export default function Appearance({ data, refresh, toast }) {
     setBusy(true);
     const palette = normalizeTheme(draft);
     try {
-      const response = await api.saveSettings({ theme: palette });
+      const response = await api.saveSettings({ theme: palette, visualStyle: style, fontScale });
       const stored = response?.settings?.theme;
-      const accepted = Boolean(stored) && typeof stored === 'object' && themeMatches(stored, palette);
-      // Keep a device copy either way, so a reload never loses the palette while
-      // an older API (or a redeploy that reset the JSON file) catches up.
-storeTheme(palette, accepted ? response.settings.themeUpdatedAt || undefined : undefined);
-      if (accepted) {
-        toast('Colours saved — the public site is updated');
+      const themeAccepted = Boolean(stored) && typeof stored === 'object' && themeMatches(stored, palette);
+      const styleAccepted = response?.settings?.visualStyle === style;
+      const fontAccepted = response?.settings?.fontScale === fontScale;
+      // Keep device copies either way, so a reload never loses the owner's choices
+      // while an older API (or a redeploy with a reset JSON file) catches up.
+      storeTheme(palette, themeAccepted ? response.settings.themeUpdatedAt || undefined : undefined);
+      storeVisualStyle(style, styleAccepted ? response.settings.styleUpdatedAt || undefined : undefined);
+      storeFontScale(fontScale, fontAccepted ? response.settings.fontScaleUpdatedAt || undefined : undefined);
+      if (themeAccepted && styleAccepted && fontAccepted) {
+        toast('Colours, glass finish and font size saved — the public site is updated');
       } else {
-        toast('Colours saved on this device, but the live API did not store them. Publish them by deploying the latest backend.', 'error');
+        toast('Saved on this device, but the live API did not store every appearance choice. Deploy the latest backend.', 'error');
       }
       await refresh();
     } catch (err) {
@@ -133,25 +192,121 @@ storeTheme(palette, accepted ? response.settings.themeUpdatedAt || undefined : u
       <div className="studio__top">
         <div>
           <h1>Appearance</h1>
-          <p>Colour control for the public site. Everything previews live — save to publish it.</p>
+          <p>Choose the Liquid Glass finish, font size and colour palette for the public site. Everything previews live.</p>
         </div>
         <div className="appearance__actions">
-          <button type="button" className="btn btn--ghost btn--sm" onClick={() => setDraft(saved)} disabled={!dirty || busy}>
+          <button
+            type="button"
+            className="btn btn--ghost btn--sm"
+            onClick={() => {
+              setDraft(saved);
+              setStyle(savedStyle);
+              setFontScale(savedFontScale);
+            }}
+            disabled={!dirty || busy}
+          >
             <Icon name="arrow" size={14} style={{ transform: 'rotate(180deg)' }} />
             Revert
           </button>
-          <button type="button" className="btn btn--ghost btn--sm" onClick={() => setDraft({ ...THEME_DEFAULTS })} disabled={busy}>
+          <button
+            type="button"
+            className="btn btn--ghost btn--sm"
+            onClick={() => {
+              setDraft({ ...THEME_DEFAULTS });
+              setStyle('liquid');
+              setFontScale(DEFAULT_FONT_SCALE);
+            }}
+            disabled={busy}
+          >
             Reset default
           </button>
           <button className="btn btn--gold btn--sm" disabled={!dirty || busy}>
             <Icon name="check" size={15} />
-            {busy ? 'Saving…' : 'Save colours'}
+            {busy ? 'Saving…' : 'Save appearance'}
           </button>
         </div>
       </div>
 
       <div className="appearance__grid">
         <div className="appearance__col">
+          <section className="panel visual-style-panel">
+            <div className="panel__head">
+              <div>
+                <h3>Visual finish</h3>
+                <p>Choose how light, blur and colour move through every surface.</p>
+              </div>
+              {style === 'liquid' ? <span className="badge-status badge-status--live">Liquid Glass</span> : null}
+            </div>
+            <div className="visual-style-grid">
+              {VISUAL_STYLE_CHOICES.map((choice) => (
+                <button
+                  key={choice.id}
+                  type="button"
+                  className={`visual-style-card ${style === choice.id ? 'is-active' : ''}`}
+                  onClick={() => setStyle(choice.id)}
+                  aria-pressed={style === choice.id}
+                >
+                  <span className={`visual-style-card__swatch visual-style-card__swatch--${choice.id}`} aria-hidden="true">
+                    <i /><i /><i />
+                  </span>
+                  <span className="visual-style-card__copy">
+                    <strong>{choice.name}</strong>
+                    <small>{choice.note}</small>
+                  </span>
+                  {style === choice.id ? <Icon name="check" size={15} /> : null}
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section className="panel font-scale-panel">
+            <div className="panel__head">
+              <div>
+                <h3>Font size</h3>
+                <p>Scale every heading, label and paragraph across the public site.</p>
+              </div>
+              <span className="font-scale-badge">{fontScale}%</span>
+            </div>
+            <div className="font-scale-control">
+              <label htmlFor="font-scale-range">Type scale</label>
+              <input
+                id="font-scale-range"
+                type="range"
+                min={FONT_SCALE_MIN}
+                max={FONT_SCALE_MAX}
+                step={FONT_SCALE_STEP}
+                value={fontScale}
+                onChange={(event) => setFontScale(Number(event.target.value))}
+                aria-valuetext={`${fontScale} percent`}
+              />
+              <div className="font-scale-range-labels">
+                <span>{FONT_SCALE_MIN}%</span>
+                <span>{DEFAULT_FONT_SCALE}%</span>
+                <span>{FONT_SCALE_MAX}%</span>
+              </div>
+            </div>
+            <div className="font-scale-presets">
+              {FONT_SCALE_CHOICES.map((choice) => (
+                <button
+                  key={choice.value}
+                  type="button"
+                  className={fontScale === choice.value ? 'is-active' : ''}
+                  onClick={() => setFontScale(choice.value)}
+                  aria-pressed={fontScale === choice.value}
+                  title={choice.note}
+                >
+                  <strong>{choice.label}</strong>
+                  <small>{choice.value}%</small>
+                </button>
+              ))}
+            </div>
+            <div className="font-scale-preview" aria-label={`Font size preview at ${fontScale}%`}>
+              <span className="eyebrow eyebrow--plain">Live type preview</span>
+              <strong>Accra Nights</strong>
+              <p>Afro-fusion from the heart of Accra. Warm guitars, talking drums, 808s.</p>
+            </div>
+          </section>
+
           <section className="panel">
             <div className="panel__head">
               <div>
@@ -267,7 +422,7 @@ storeTheme(palette, accepted ? response.settings.themeUpdatedAt || undefined : u
               </div>
               {dirty ? <span className="theme-unsaved">Unsaved</span> : null}
             </div>
-            <Preview theme={draft} />
+            <Preview theme={draft} style={style} />
             <div className="theme-swatches">
               {THEME_CONTROLS.map((control) => (
                 <span key={control.key} title={`${control.label} ${draft[control.key]}`}>
@@ -286,14 +441,14 @@ storeTheme(palette, accepted ? response.settings.themeUpdatedAt || undefined : u
       <div className={`appearance__savebar ${deviceOnly ? 'is-device' : ''}`}>
         <span>
           {dirty
-            ? 'You have unsaved colour changes.'
+            ? 'You have unsaved appearance changes.'
             : deviceOnly
               ? 'Saved on this device — deploy the latest backend to publish it to every visitor.'
-              : 'Colours match the live site.'}
+              : 'The live site matches this appearance.'}
         </span>
         <button className="btn btn--gold btn--sm" disabled={!dirty || busy}>
           <Icon name="check" size={15} />
-          {busy ? 'Saving…' : 'Save colours'}
+          {busy ? 'Saving…' : 'Save appearance'}
         </button>
       </div>
     </form>

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import Icon from '../components/Icon';
 import { api } from '../lib/api';
 import { useToast } from '../context/ToastContext';
@@ -135,9 +136,14 @@ export default function Website({ data, refresh }) {
           <h1>Website</h1>
           <p>The first thing fans see. Upload a new photo and the homepage changes the moment it finishes.</p>
         </div>
-        <a className="btn btn--ghost btn--sm" href="/" target="_blank" rel="noreferrer">
-          <Icon name="external" size={14} /> See it live
-        </a>
+        <div className="website-top-actions">
+          <Link className="btn btn--ghost btn--sm" to="/studio/media">
+            <Icon name="image" size={14} /> All images
+          </Link>
+          <a className="btn btn--ghost btn--sm" href="/" target="_blank" rel="noreferrer">
+            <Icon name="external" size={14} /> See it live
+          </a>
+        </div>
       </div>
 
       <div className="panel">

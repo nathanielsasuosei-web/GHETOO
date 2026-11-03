@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import Icon from './Icon';
+import BrandLogo from './BrandLogo';
 import Newsletter from './Newsletter';
 import { useSite } from '../context/SiteContext';
 
@@ -20,7 +21,7 @@ export default function Footer() {
         <div className="footer__top">
           <div className="footer__brand">
             <Link to="/" className="brand">
-              <span className="brand__mark">YS</span>
+              <BrandLogo settings={settings} />
               <span className="brand__text">
                 <span className="brand__name">{settings.artistName}</span>
                 <span className="brand__sub">{settings.tagline}</span>
@@ -57,6 +58,7 @@ export default function Footer() {
             <Link to="/merch">Merch store</Link>
             <a href={`mailto:${settings.contactEmail || 'hello@youngsilence.gh'}`}>Bookings & press</a>
             <Link to="/studio">Artist studio</Link>
+            <Link to="/account">Fan account</Link>
           </div>
 
           <div className="footer__col">
