@@ -2647,6 +2647,10 @@ body::before {
   gap: 8px;
 }
 
+.theme-device-note {
+  margin-top: 14px;
+}
+
 .panel--preview {
   display: flex;
   flex-direction: column;

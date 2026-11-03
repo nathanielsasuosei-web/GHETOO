@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
-import { applyTheme } from '../lib/theme';
+import { applyTheme, resolveTheme } from '../lib/theme';
 
 const SiteContext = createContext(null);
 
@@ -32,8 +32,8 @@ export function SiteProvider({ children }) {
 
   // The owner's saved colours restyle the whole site (see Studio → Appearance).
   useEffect(() => {
-    applyTheme(site?.settings?.theme);
-  }, [site?.settings?.theme]);
+    applyTheme(resolveTheme(site?.settings).theme);
+  }, [site?.settings?.theme, site?.settings?.themeUpdatedAt]);
 
   const value = useMemo(() => ({ site, loading, error, reload: load }), [site, loading, error, load]);
   return <SiteContext.Provider value={value}>{children}</SiteContext.Provider>;

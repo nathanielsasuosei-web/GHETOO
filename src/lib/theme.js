@@ -268,3 +268,60 @@ export const THEME_CONTROLS = [
   { key: 'surface', label: 'Surface', hint: 'Cards, panels and glass' },
   { key: 'text', label: 'Text', hint: 'Headings and body copy' },
 ];
+
+const THEME_STORAGE_KEY = 'ys-theme-v1';
+
+/**
+ * A device copy of the palette. The studio writes this on every save so colours
+ * survive a reload even if the API that answered is not yet storing themes.
+ */
+export function readStoredTheme() {
+  try {
+    if (typeof localStorage === 'undefined') return null;
+    const raw = localStorage.getItem(THEME_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || !parsed.theme) return null;
+    return {
+      theme: normalizeTheme(parsed.theme),
+      savedAt: typeof parsed.savedAt === 'string' ? parsed.savedAt : '',
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function storeTheme(theme, savedAt = new Date().toISOString()) {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify({ theme: normalizeTheme(theme), savedAt }));
+    }
+  } catch {
+    /* Private mode or a full quota — the in-memory theme still applies. */
+  }
+  return savedAt;
+}
+
+export function clearStoredTheme() {
+  try {
+    if (typeof localStorage !== 'undefined') localStorage.removeItem(THEME_STORAGE_KEY);
+  } catch {
+    /* Nothing to clear. */
+  }
+}
+
+const timeOf = (value) => Date.parse(value || '') || 0;
+
+/**
+ * Picks the palette to show: the server's saved theme, unless this device holds a
+ * newer one (which happens when the API in front of us does not store themes yet).
+ */
+export function resolveTheme(settings) {
+  const serverTheme = normalizeTheme(settings?.theme);
+  const serverAt = timeOf(settings?.themeUpdatedAt);
+  const stored = readStoredTheme();
+  if (stored && timeOf(stored.savedAt) > serverAt) {
+    return { theme: stored.theme, source: 'device', savedAt: stored.savedAt, serverAt };
+  }
+  return { theme: serverTheme, source: 'server', savedAt: settings?.themeUpdatedAt || '', serverAt };
+}

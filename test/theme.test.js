@@ -14,11 +14,24 @@ import {
   normalizeHex,
   normalizeTheme,
   readableOn,
+  readStoredTheme,
+  resolveTheme,
   sanitizeTheme,
+  storeTheme,
   suggestText,
   themeReport,
   themeVars,
 } from '../src/lib/theme.js';
+
+function fakeStorage() {
+  const store = new Map();
+  globalThis.localStorage = {
+    getItem: (key) => (store.has(key) ? store.get(key) : null),
+    setItem: (key, value) => store.set(key, String(value)),
+    removeItem: (key) => store.delete(key),
+  };
+  return store;
+}
 
 async function freePort() {
   const socket = net.createServer();
@@ -118,6 +131,36 @@ test('theme colours normalise, mix and stay readable', () => {
   assert.throws(() => sanitizeTheme(null), /hex values/);
 });
 
+test('a device copy keeps the palette when the API has not stored it yet', () => {
+  fakeStorage();
+  const serverTheme = { accent: '#ff7a59', background: '#0d0708', surface: '#1b1013', text: '#fdf2ea', glow: '#ffb020' };
+
+  // Nothing on this device yet: the server wins.
+  assert.deepEqual(resolveTheme({ theme: serverTheme }).theme, normalizeTheme(serverTheme));
+  assert.equal(resolveTheme({ theme: serverTheme }).source, 'server');
+
+  // A newer device copy wins over an older server theme.
+  storeTheme({ ...serverTheme, accent: '#4fb3ff' }, '2026-01-02T00:00:00.000Z');
+  const deviceFirst = resolveTheme({ theme: serverTheme, themeUpdatedAt: '2026-01-01T00:00:00.000Z' });
+  assert.equal(deviceFirst.source, 'device');
+  assert.equal(deviceFirst.theme.accent, '#4fb3ff');
+
+  // A server save that happened later wins again.
+  const serverLast = resolveTheme({ theme: serverTheme, themeUpdatedAt: '2026-02-01T00:00:00.000Z' });
+  assert.equal(serverLast.source, 'server');
+  assert.equal(serverLast.theme.accent, '#ff7a59');
+
+  // An API that drops the theme entirely still leaves the device copy in charge.
+  const dropped = resolveTheme({ artistName: 'Young Silence' });
+  assert.equal(dropped.source, 'device');
+
+  assert.equal(readStoredTheme().theme.accent, '#4fb3ff');
+  globalThis.localStorage.setItem('ys-theme-v1', '{not json');
+  assert.equal(readStoredTheme(), null);
+  delete globalThis.localStorage;
+  assert.equal(resolveTheme({ theme: serverTheme }).source, 'server');
+});
+
 test('the owner can save colours from the studio and the site serves them', async (t) => {
   const dataDir = await mkdtemp(path.join(os.tmpdir(), 'ghetoo-theme-'));
   let server;
@@ -155,10 +198,12 @@ test('the owner can save colours from the studio and the site serves them', asyn
     assert.equal(saved.response.status, 200);
     assert.equal(saved.data.settings.theme.accent, '#4fb3ff');
     assert.equal(saved.data.settings.theme.glow, '#34e0c4');
+    assert.ok(Date.parse(saved.data.settings.themeUpdatedAt) > 0, 'themeUpdatedAt is stamped');
 
     site = (await request(base, '/api/site')).data;
     assert.equal(site.settings.theme.accent, '#4fb3ff');
     assert.equal(site.settings.theme.background, '#050c14');
+    assert.equal(site.settings.themeUpdatedAt, saved.data.settings.themeUpdatedAt);
 
     // A partial patch keeps the rest of the palette.
     const partial = await request(base, '/api/admin/settings', {

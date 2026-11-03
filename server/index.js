@@ -940,6 +940,7 @@ app.patch('/api/admin/settings', (req, res) => {
   if (body.theme !== undefined) {
     try {
       state.settings.theme = { ...(state.settings.theme || {}), ...sanitizeTheme(body.theme) };
+      state.settings.themeUpdatedAt = new Date().toISOString();
     } catch (err) {
       return res.status(400).json({ error: err.message });
     }

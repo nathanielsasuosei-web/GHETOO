@@ -9,6 +9,8 @@ import {
   isHex,
   normalizeHex,
   normalizeTheme,
+  resolveTheme,
+  storeTheme,
   suggestText,
   themeMatches,
   themeReport,
@@ -56,7 +58,8 @@ function Preview({ theme }) {
 }
 
 export default function Appearance({ data, refresh, toast }) {
-  const saved = useMemo(() => normalizeTheme(data.settings.theme), [data.settings.theme]);
+  const resolved = useMemo(() => resolveTheme(data.settings), [data.settings]);
+  const saved = resolved.theme;
   const [draft, setDraft] = useState(saved);
   const [typing, setTyping] = useState({});
   const [busy, setBusy] = useState(false);
@@ -76,6 +79,8 @@ export default function Appearance({ data, refresh, toast }) {
   useEffect(() => () => applyTheme(savedRef.current), []);
 
   const dirty = !themeMatches(draft, saved);
+  // True when this browser is showing a palette the API has not stored yet.
+  const deviceOnly = resolved.source === 'device' && !themeMatches(saved, data.settings.theme);
   const report = themeReport(draft);
   const activePreset = THEME_PRESETS.find((preset) => themeMatches(preset.theme, draft))?.id;
 
@@ -102,9 +107,19 @@ export default function Appearance({ data, refresh, toast }) {
   const save = async (event) => {
     event?.preventDefault?.();
     setBusy(true);
+    const palette = normalizeTheme(draft);
     try {
-      await api.saveSettings({ theme: normalizeTheme(draft) });
-      toast('Colours saved — the public site is updated');
+      const response = await api.saveSettings({ theme: palette });
+      const stored = response?.settings?.theme;
+      const accepted = Boolean(stored) && typeof stored === 'object' && themeMatches(stored, palette);
+      // Keep a device copy either way, so a reload never loses the palette while
+      // an older API (or a redeploy that reset the JSON file) catches up.
+storeTheme(palette, accepted ? response.settings.themeUpdatedAt || undefined : undefined);
+      if (accepted) {
+        toast('Colours saved — the public site is updated');
+      } else {
+        toast('Colours saved on this device, but the live API did not store them. Publish them by deploying the latest backend.', 'error');
+      }
       await refresh();
     } catch (err) {
       toast(err.message, 'error');
@@ -229,6 +244,17 @@ export default function Appearance({ data, refresh, toast }) {
                 Match surface to background
               </button>
             </div>
+
+            {deviceOnly ? (
+              <div className="alert alert--info theme-device-note">
+                <Icon name="bolt" size={16} />
+                <span>
+                  These colours are saved on this device only. The API in front of the studio is not storing themes
+                  yet — deploy the latest backend (or give it a persistent <code>DATA_DIR</code>) and save again to
+                  publish them to every visitor.
+                </span>
+              </div>
+            ) : null}
           </section>
         </div>
 
@@ -257,9 +283,13 @@ export default function Appearance({ data, refresh, toast }) {
         </div>
       </div>
 
-      <div className="appearance__savebar">
+      <div className={`appearance__savebar ${deviceOnly ? 'is-device' : ''}`}>
         <span>
-          {dirty ? 'You have unsaved colour changes.' : 'Colours match the live site.'}
+          {dirty
+            ? 'You have unsaved colour changes.'
+            : deviceOnly
+              ? 'Saved on this device — deploy the latest backend to publish it to every visitor.'
+              : 'Colours match the live site.'}
         </span>
         <button className="btn btn--gold btn--sm" disabled={!dirty || busy}>
           <Icon name="check" size={15} />

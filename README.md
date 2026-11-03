@@ -58,7 +58,8 @@ No third-party CMS, no label, no gatekeepers. One Node process + a JSON file.
 - **Appearance tab** — the owner's colour controls: six one-tap presets plus custom accent,
   glow, background, surface and text colours with native pickers and hex entry. Everything
   previews live, shows WCAG contrast grades, and saving restyles the whole public site for
-  every visitor
+  every visitor (the palette is stored with the rest of `settings`, and the studio also keeps
+  a device copy so a lost or not-yet-updated API never silently reverts the owner's colours)
 - Edit the artist profile, bio, payout numbers, goal and socials
 
 ---
