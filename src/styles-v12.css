@@ -209,21 +209,6 @@ body::before {
   letter-spacing: 0.11em;
 }
 
-.v12-edition {
-  display: inline-flex;
-  align-items: center;
-  height: 18px;
-  padding: 0 6px;
-  border-radius: 5px;
-  border: 1px solid rgba(240, 179, 84, 0.34);
-  background: rgba(240, 179, 84, 0.1);
-  color: var(--v12-gold-soft);
-  font-family: var(--mono);
-  font-size: 8px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-}
-
 .v12-nav {
   gap: 2px;
   padding: 4px;
@@ -2348,10 +2333,6 @@ body::before {
   }
 
   .v12-header .brand__text {
-    display: none;
-  }
-
-  .v12-edition {
     display: none;
   }
 

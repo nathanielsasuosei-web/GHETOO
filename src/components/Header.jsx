@@ -95,11 +95,7 @@ export default function Header() {
           <Link to="/" className="brand" aria-label="Young Silence — home">
             <span className="brand__mark">YS</span>
             <span className="brand__text">
-              <span className="brand__name">
-                {settings?.artistName || 'Young Silence'}
-                <span className="v12-edition">V12</span>
-              </span>
-              <span className="brand__sub">{settings?.city || 'Accra, Ghana'}</span>
+              <span className="brand__name">{settings?.artistName || 'Young Silence'}</span>
             </span>
           </Link>
 
