@@ -55,6 +55,11 @@ No third-party CMS, no label, no gatekeepers. One Node process + a JSON file.
 - Messages inbox with reply-by-email links
 - **Website tab** — upload/replace the homepage hero photo (with a live preview, framing
   control and "use original" reset), the portrait photo, and the hero copy + announcement bar
+- **Appearance tab** — the owner's colour controls: six one-tap presets plus custom accent,
+  glow, background, surface and text colours with native pickers and hex entry. Everything
+  previews live, shows WCAG contrast grades, and saving restyles the whole public site for
+  every visitor (the palette is stored with the rest of `settings`, and the studio also keeps
+  a device copy so a lost or not-yet-updated API never silently reverts the owner's colours)
 - Edit the artist profile, bio, payout numbers, goal and socials
 
 ---

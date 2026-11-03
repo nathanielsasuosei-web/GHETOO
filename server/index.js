@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { MUSIC_PLATFORMS, normalizeStreamingUrl, safeStreamingUrl, videoYouTubeUrl } from '../src/lib/streaming.js';
 import { MIN_SUPPORT_PESEWAS, MAX_SUPPORT_PESEWAS, isValidSupportMinimum, supportMinimum } from '../src/lib/support.js';
+import { sanitizeTheme } from '../src/lib/theme.js';
 import { getState, save, saveNow, UPLOAD_DIR, DATA_DIR, id, reference } from './db.js';
 import {
   createSession,
@@ -935,6 +936,14 @@ app.patch('/api/admin/settings', (req, res) => {
   ];
   for (const key of allowed) {
     if (body[key] !== undefined) state.settings[key] = body[key];
+  }
+  if (body.theme !== undefined) {
+    try {
+      state.settings.theme = { ...(state.settings.theme || {}), ...sanitizeTheme(body.theme) };
+      state.settings.themeUpdatedAt = new Date().toISOString();
+    } catch (err) {
+      return res.status(400).json({ error: err.message });
+    }
   }
   if (body.momo && typeof body.momo === 'object') {
     state.settings.momo = { ...state.settings.momo, ...body.momo };

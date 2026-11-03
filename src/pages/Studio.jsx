@@ -14,6 +14,7 @@ import Messages from '../studio/Messages';
 import Newsletter from '../studio/Newsletter';
 import Settings from '../studio/Settings';
 import Website from '../studio/Website';
+import Appearance from '../studio/Appearance';
 
 const TABS = [
   {
@@ -23,6 +24,10 @@ const TABS = [
   {
     id: 'website', label: 'Website', icon: 'image', group: 'Workspace',
     description: 'Homepage image and hero copy', keywords: 'hero photo portrait announcement design',
+  },
+  {
+    id: 'appearance', label: 'Appearance', icon: 'sparkle', group: 'Workspace',
+    description: 'Colours, presets and live theme preview', keywords: 'theme colours colors palette brand design accent background dark light',
   },
   {
     id: 'releases', label: 'Music', icon: 'music', group: 'Workspace',
@@ -613,6 +618,7 @@ export default function Studio() {
 
           {active === 'overview' ? <Overview {...common} /> : null}
           {active === 'website' ? <Website {...common} /> : null}
+          {active === 'appearance' ? <Appearance {...common} /> : null}
           {active === 'releases' ? <Releases {...common} /> : null}
           {active === 'videos' ? <VideoManager {...common} /> : null}
           {active === 'events' ? <Events {...common} /> : null}
