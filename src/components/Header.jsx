@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import Icon from './Icon';
+import BrandMark from './BrandMark';
 import { useSite } from '../context/SiteContext';
 import { useSupport } from '../context/SupportContext';
+import { useFan } from '../context/FanContext';
+import { initials } from '../lib/format';
 
 const links = [
   { to: '/music', label: 'Music', icon: 'music', blurb: 'Releases, lyrics and listening links' },
@@ -18,6 +21,7 @@ const primaryLinks = links.slice(0, 3);
 export default function Header() {
   const { site } = useSite();
   const { openSupport } = useSupport();
+  const { fan, openAuth } = useFan();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const [megaOpen, setMegaOpen] = useState(false);
@@ -93,7 +97,7 @@ export default function Header() {
       <header className={`header v12-header ${scrolled || open || megaOpen ? 'header--solid' : ''}`}>
         <div className="container header__inner">
           <Link to="/" className="brand" aria-label="Young Silence — home">
-            <span className="brand__mark">YS</span>
+            <BrandMark />
             <span className="brand__text">
               <span className="brand__name">{settings?.artistName || 'Young Silence'}</span>
             </span>
@@ -187,6 +191,21 @@ export default function Header() {
           </nav>
 
           <div className="header__actions">
+            {fan ? (
+              <Link to="/account" className="account-chip" title="Your fan account">
+                <span className="account-chip__avatar">{initials(fan.name) || 'F'}</span>
+                <span className="account-chip__name">{fan.name.split(/\s+/)[0]}</span>
+              </Link>
+            ) : (
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm account-chip account-chip--guest"
+                onClick={() => openAuth('signin')}
+              >
+                <Icon name="user" size={15} />
+                <span className="account-chip__name">Sign in</span>
+              </button>
+            )}
             <button className="btn btn--gold btn--sm v12-header-cta" onClick={() => openSupport()}>
               <Icon name="heart" size={15} />
               Support the music
@@ -223,6 +242,21 @@ export default function Header() {
               </Link>
             ))}
           </div>
+          {fan ? (
+            <Link to="/account" className="btn btn--ghost" onClick={() => setOpen(false)}>
+              <Icon name="user" size={16} /> My account
+            </Link>
+          ) : (
+            <button
+              className="btn btn--ghost"
+              onClick={() => {
+                setOpen(false);
+                openAuth('signup');
+              }}
+            >
+              <Icon name="user" size={16} /> Create account
+            </button>
+          )}
           <button
             className="btn btn--gold"
             onClick={() => {

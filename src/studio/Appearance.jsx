@@ -16,6 +16,7 @@ import {
   themeReport,
   themeVars,
 } from '../lib/theme';
+import { GLASS_INTENSITIES, applyGlass, glassMatches, normalizeGlass } from '../lib/glass';
 
 const pct = (ratio) => `${ratio.toFixed(1)}:1`;
 
@@ -63,13 +64,22 @@ export default function Appearance({ data, refresh, toast }) {
   const [draft, setDraft] = useState(saved);
   const [typing, setTyping] = useState({});
   const [busy, setBusy] = useState(false);
+  const savedGlass = normalizeGlass(data.settings);
+  const [glassDraft, setGlassDraft] = useState(savedGlass);
+  const [glassBusy, setGlassBusy] = useState(false);
   const savedRef = useRef(saved);
+  const savedGlassRef = useRef(savedGlass);
   savedRef.current = saved;
+  savedGlassRef.current = savedGlass;
 
   useEffect(() => {
     setDraft(saved);
     setTyping({});
   }, [saved]);
+
+  useEffect(() => {
+    setGlassDraft(normalizeGlass(data.settings));
+  }, [data.settings]);
 
   // Live preview: the studio (and the public site behind it) recolours as you drag.
   useEffect(() => {
@@ -78,6 +88,14 @@ export default function Appearance({ data, refresh, toast }) {
 
   useEffect(() => () => applyTheme(savedRef.current), []);
 
+  // Liquid Glass previews live too; leaving the tab without saving restores the
+  // published look instead of leaving this browser out of sync.
+  useEffect(() => {
+    applyGlass(glassDraft);
+  }, [glassDraft]);
+  useEffect(() => () => applyGlass(savedGlassRef.current), []);
+
+  const glassDirty = !glassMatches(glassDraft, savedGlass);
   const dirty = !themeMatches(draft, saved);
   // True when this browser is showing a palette the API has not stored yet.
   const deviceOnly = resolved.source === 'device' && !themeMatches(saved, data.settings.theme);
@@ -125,6 +143,23 @@ storeTheme(palette, accepted ? response.settings.themeUpdatedAt || undefined : u
       toast(err.message, 'error');
     } finally {
       setBusy(false);
+    }
+  };
+
+  const saveGlass = async () => {
+    setGlassBusy(true);
+    try {
+      await api.saveSettings({
+        liquidGlass: glassDraft.liquidGlass,
+        glassIntensity: glassDraft.glassIntensity,
+      });
+      applyGlass(glassDraft);
+      toast(glassDraft.liquidGlass ? 'Liquid Glass published for every visitor' : 'Liquid Glass turned off');
+      await refresh();
+    } catch (err) {
+      toast(err.message, 'error');
+    } finally {
+      setGlassBusy(false);
     }
   };
 
@@ -179,6 +214,52 @@ storeTheme(palette, accepted ? response.settings.themeUpdatedAt || undefined : u
                   {activePreset === preset.id ? <Icon name="check" size={14} /> : null}
                 </button>
               ))}
+            </div>
+          </section>
+
+          <section className="panel glass-panel">
+            <div className="panel__head">
+              <div>
+                <h3>Liquid Glass</h3>
+                <p>Refractive, translucent surfaces with soft caustics and specular edges. Applies to the whole site.</p>
+              </div>
+              <span className="badge-status badge-status--live">Site-wide</span>
+            </div>
+            <div className="toggle-row">
+              <div>
+                <strong>Enable Liquid Glass</strong>
+                <small>Turn off to return to the flat V12 surfaces.</small>
+              </div>
+              <button
+                type="button"
+                className={`switch ${glassDraft.liquidGlass ? 'is-on' : ''}`}
+                onClick={() => setGlassDraft((current) => ({ ...current, liquidGlass: !current.liquidGlass }))}
+                aria-label="Toggle Liquid Glass"
+                aria-pressed={glassDraft.liquidGlass}
+              />
+            </div>
+            <span className="field__hint" style={{ display: 'block', margin: '18px 0 10px' }}>Intensity</span>
+            <div className="glass-intensities">
+              {GLASS_INTENSITIES.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  className={`glass-intensity ${glassDraft.glassIntensity === option.id ? 'is-active' : ''}`}
+                  onClick={() => setGlassDraft((current) => ({ ...current, liquidGlass: true, glassIntensity: option.id }))}
+                  aria-pressed={glassDraft.glassIntensity === option.id && glassDraft.liquidGlass}
+                  disabled={!glassDraft.liquidGlass}
+                >
+                  <Icon name="droplet" size={16} />
+                  <strong>{option.name}</strong>
+                  <small>{option.note}</small>
+                </button>
+              ))}
+            </div>
+            <div className="glass-savebar">
+              <span>{glassDirty ? 'Unsaved glass changes — previewing on this device.' : 'Glass matches the live site.'}</span>
+              <button type="button" className="btn btn--gold btn--sm" onClick={saveGlass} disabled={!glassDirty || glassBusy}>
+                <Icon name="check" size={15} /> {glassBusy ? 'Saving…' : 'Save liquid glass'}
+              </button>
             </div>
           </section>
 

@@ -3,9 +3,11 @@ import { Link } from 'react-router-dom';
 import Icon from './Icon';
 import { useSite } from '../context/SiteContext';
 import { useSupport } from '../context/SupportContext';
+import { useFan } from '../context/FanContext';
 import { api } from '../lib/api';
 import { cedis } from '../lib/format';
-import { MAX_SUPPORT_PESEWAS, supportMinimum, supportPresets } from '../lib/support';
+import { MAX_SUPPORT_PESEWAS } from '../lib/support';
+import { pricingFor } from '../lib/pricing';
 
 const NETWORKS = [
   { id: 'mtn', label: 'MTN MoMo', color: '#FFCC00' },
@@ -42,6 +44,7 @@ function CopyRow({ label, value }) {
 export default function SupportModal() {
   const { open, track: presetTrack, video: presetVideo, amount: presetAmount, closeSupport } = useSupport();
   const { site } = useSite();
+  const { fan, openAuth, refreshOrders } = useFan();
   const tracks = site?.tracks || [];
   const videos = site?.videos || [];
   const [step, setStep] = useState('form');
@@ -68,7 +71,9 @@ export default function SupportModal() {
     () => videos.find((v) => v.id === videoId) || null,
     [videos, videoId]
   );
-  const floor = supportMinimum(site?.minSupport);
+  const pricing = pricingFor(site);
+  const floor = pricing.floor;
+  const fixedPrice = pricing.fixed;
 
   useEffect(() => {
     if (!open) return;
@@ -79,8 +84,10 @@ export default function SupportModal() {
     setBusy(false);
     setTrackId(presetTrack?.id || '');
     setVideoId(presetVideo?.id || '');
-    const requested = Number.isSafeInteger(presetAmount) ? presetAmount : floor;
+    const requested = Number.isSafeInteger(presetAmount) && !fixedPrice ? presetAmount : floor;
     setAmountInput(String(Math.min(MAX_SUPPORT_PESEWAS, Math.max(floor, requested)) / 100));
+    setName(fan?.name || '');
+    setEmail(fan?.email || '');
     setMessage('');
     document.body.style.overflow = 'hidden';
     const onKey = (e) => e.key === 'Escape' && closeSupport();
@@ -89,7 +96,7 @@ export default function SupportModal() {
       document.body.style.overflow = '';
       window.removeEventListener('keydown', onKey);
     };
-  }, [open, presetTrack?.id, presetVideo?.id, presetAmount, floor, closeSupport]);
+  }, [open, presetTrack?.id, presetVideo?.id, presetAmount, floor, fixedPrice, fan?.name, fan?.email, closeSupport]);
 
   // poll while waiting for a manual MoMo confirmation
   useEffect(() => {
@@ -116,7 +123,7 @@ export default function SupportModal() {
 
   if (!open || !site) return null;
 
-  const presets = supportPresets(floor);
+  const presets = pricing.amounts;
   const numericAmount = Number(amountInput);
   const amount = amountInput.trim() && Number.isFinite(numericAmount) ? Math.round(numericAmount * 100) : NaN;
 
@@ -159,6 +166,7 @@ export default function SupportModal() {
       setOrder(result.order || null);
       setMomo(result.momo || null);
       setStep(result.status === 'paid' ? 'paid' : 'pending');
+      if (fan) refreshOrders();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -177,7 +185,11 @@ export default function SupportModal() {
               <div>
                 <span className="eyebrow">Support the artist</span>
                 <h3>{selectedVideo ? 'Support this video' : selectedTrack ? (selectedTrack.hasDownload ? 'Buy this record' : 'Support this release') : 'Fund the next release'}</h3>
-                <p>Support from {cedis(floor)}. You can choose to give more.</p>
+                <p>
+                  {fixedPrice
+                    ? `The artist has set one price: ${cedis(floor)}.`
+                    : `Support from ${cedis(floor)}. You can choose to give more.`}
+                </p>
               </div>
               <button type="button" className="modal__close" onClick={closeSupport} aria-label="Close">
                 <Icon name="close" size={16} />
@@ -191,7 +203,7 @@ export default function SupportModal() {
                   <div>
                     <h4>{selectedTrack?.title || selectedVideo?.title}</h4>
                     <p>
-                      {selectedTrack ? `${selectedTrack.genre} · ${selectedTrack.year}` : 'Video'} · from {cedis(floor)}
+                      {selectedTrack ? `${selectedTrack.genre} · ${selectedTrack.year}` : 'Video'} · {fixedPrice ? cedis(floor) : `from ${cedis(floor)}`}
                     </p>
                     {selectedVideo || !selectedTrack.hasDownload ? <p>Support only — no download is included.</p> : null}
                   </div>
@@ -231,37 +243,47 @@ export default function SupportModal() {
                 </div>
               )}
 
-              <div className="amounts">
-                {presets.map((value) => (
-                  <button
-                    type="button"
-                    key={value}
-                    className={amount === value ? 'is-active' : ''}
-                    onClick={() => setAmountInput(String(value / 100))}
-                  >
-                    {cedis(value, { withSymbol: false })}
-                  </button>
-                ))}
-              </div>
-
-              <div className="field amount-input">
-                <label htmlFor="support-amount">Your amount (GH₵)</label>
-                <span>GH₵</span>
-                <input
-                  id="support-amount"
-                  type="number"
-                  min={floor / 100}
-                  max={MAX_SUPPORT_PESEWAS / 100}
-                  step="0.01"
-                  value={amountInput}
-                  onChange={(e) => setAmountInput(e.target.value)}
-                  inputMode="decimal"
-                  required
-                />
-                <div className="field__hint">
-                  Artist-set minimum {cedis(floor)} · maximum per payment {cedis(MAX_SUPPORT_PESEWAS)}.
+              {fixedPrice ? (
+                <div className="artist-price">
+                  <span className="eyebrow eyebrow--plain">Artist-set price</span>
+                  <strong>{cedis(floor)}</strong>
+                  <p>One price for every song, video and general support. Set by the artist in the studio.</p>
                 </div>
-              </div>
+              ) : (
+                <>
+                  <div className="amounts" style={{ gridTemplateColumns: `repeat(${Math.min(presets.length, 6)}, 1fr)` }}>
+                    {presets.map((value) => (
+                      <button
+                        type="button"
+                        key={value}
+                        className={amount === value ? 'is-active' : ''}
+                        onClick={() => setAmountInput(String(value / 100))}
+                      >
+                        {cedis(value, { withSymbol: false })}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="field amount-input">
+                    <label htmlFor="support-amount">Your amount (GH₵)</label>
+                    <span>GH₵</span>
+                    <input
+                      id="support-amount"
+                      type="number"
+                      min={floor / 100}
+                      max={MAX_SUPPORT_PESEWAS / 100}
+                      step="0.01"
+                      value={amountInput}
+                      onChange={(e) => setAmountInput(e.target.value)}
+                      inputMode="decimal"
+                      required
+                    />
+                    <div className="field__hint">
+                      Artist-set minimum {cedis(floor)} · maximum per payment {cedis(MAX_SUPPORT_PESEWAS)}.
+                    </div>
+                  </div>
+                </>
+              )}
 
               <div className="methods">
                 <button
@@ -306,6 +328,31 @@ export default function SupportModal() {
                   </span>
                 </div>
               ) : null}
+
+              <div className="fan-checkout-note">
+                {fan ? (
+                  <>
+                    <Icon name="user" size={14} />
+                    <span>Signed in as <strong>{fan.name}</strong> — this support will be saved to your account.</span>
+                    <Link to="/account" onClick={closeSupport}>My account</Link>
+                  </>
+                ) : (
+                  <>
+                    <Icon name="shield" size={14} />
+                    <span>Want your receipts and downloads in one place?</span>
+                    <button
+                      type="button"
+                      className="link-arrow"
+                      onClick={() => {
+                        closeSupport();
+                        openAuth('signup');
+                      }}
+                    >
+                      Create a free account
+                    </button>
+                  </>
+                )}
+              </div>
 
               <div className="field-row">
                 <div className="field">

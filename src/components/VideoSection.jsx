@@ -3,7 +3,7 @@ import Icon from './Icon';
 import { api } from '../lib/api';
 import { cedis, compact, duration, longDate } from '../lib/format';
 import { safeStreamingUrl } from '../lib/streaming';
-import { supportMinimum } from '../lib/support';
+import { pricingFor } from '../lib/pricing';
 import { useSite } from '../context/SiteContext';
 import { useSupport } from '../context/SupportContext';
 
@@ -87,7 +87,8 @@ export default function VideoSection({ videos, title = 'Videos', intro, compactG
   const [active, setActive] = useState(null);
   const { site } = useSite();
   const { openSupport } = useSupport();
-  const minimum = supportMinimum(site?.minSupport);
+  const pricing = pricingFor(site);
+  const minimum = pricing.floor;
   if (!videos?.length) return null;
 
   return (
@@ -121,9 +122,9 @@ export default function VideoSection({ videos, title = 'Videos', intro, compactG
                 type="button"
                 className="video-card__support"
                 onClick={() => openSupport(null, { video })}
-                aria-label={`Support ${video.title} from ${cedis(minimum)}`}
+                aria-label={`Support ${video.title} ${pricing.fixed ? 'for' : 'from'} ${cedis(minimum)}`}
               >
-                <Icon name="heart" size={14} /> Support from {cedis(minimum)}
+                <Icon name="heart" size={14} /> Support {pricing.fixed ? 'for' : 'from'} {cedis(minimum)}
               </button>
             </article>
           );

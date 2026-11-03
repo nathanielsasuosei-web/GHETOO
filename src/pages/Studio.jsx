@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import Icon from '../components/Icon';
+import BrandMark from '../components/BrandMark';
 import { api } from '../lib/api';
 import { useToast } from '../context/ToastContext';
 import { useSite } from '../context/SiteContext';
@@ -14,6 +15,8 @@ import Messages from '../studio/Messages';
 import Newsletter from '../studio/Newsletter';
 import Settings from '../studio/Settings';
 import Website from '../studio/Website';
+import Media from '../studio/Media';
+import Fans from '../studio/Fans';
 import Appearance from '../studio/Appearance';
 
 const TABS = [
@@ -24,6 +27,10 @@ const TABS = [
   {
     id: 'website', label: 'Website', icon: 'image', group: 'Workspace',
     description: 'Homepage image and hero copy', keywords: 'hero photo portrait announcement design',
+  },
+  {
+    id: 'media', label: 'Media', icon: 'image', group: 'Workspace',
+    description: 'Replace any picture on the site', keywords: 'images hero logo favicon covers thumbnails photos uploads branding',
   },
   {
     id: 'appearance', label: 'Appearance', icon: 'sparkle', group: 'Workspace',
@@ -52,6 +59,10 @@ const TABS = [
   {
     id: 'messages', label: 'Messages', icon: 'mail', group: 'Community',
     description: 'Read and reply to fan messages', keywords: 'inbox email contact',
+  },
+  {
+    id: 'fans', label: 'Fans', icon: 'users', group: 'Community',
+    description: 'Fan accounts and their orders', keywords: 'accounts members signups users community',
   },
   {
     id: 'newsletter', label: 'Newsletter', icon: 'send', group: 'Community',
@@ -104,7 +115,7 @@ function Login({ onDone }) {
       <div className="studio-login__card v12-login__card">
         <section className="v12-login__showcase" aria-label="Studio V12">
           <Link to="/" className="v12-login__brand">
-            <span className="brand__mark">YS</span>
+            <BrandMark />
             <span>
               <strong>Young Silence</strong>
               <small>Studio V12</small>
@@ -385,7 +396,7 @@ export default function Studio() {
       >
         <div className="v12-rail__head">
           <Link to="/" className="brand v12-rail__brand">
-            <span className="brand__mark">YS</span>
+            <BrandMark />
             <span className="brand__text v12-rail__brand-text">
               <span className="brand__name">Studio V12</span>
               <span className="brand__sub">{artistName}</span>
@@ -565,7 +576,7 @@ export default function Studio() {
         <div className="studio__mobile v12-mobile-bar">
           <div className="v12-mobile-bar__top">
             <Link to="/" className="brand">
-              <span className="brand__mark" style={{ width: 32, height: 32, fontSize: 15 }}>YS</span>
+              <BrandMark style={{ width: 32, height: 32, fontSize: 15 }} />
               <span className="brand__name" style={{ fontSize: 12 }}>Studio V12</span>
             </Link>
             <button onClick={logout} className="icon-btn icon-btn--sm" aria-label="Sign out">
@@ -618,6 +629,7 @@ export default function Studio() {
 
           {active === 'overview' ? <Overview {...common} /> : null}
           {active === 'website' ? <Website {...common} /> : null}
+          {active === 'media' ? <Media {...common} /> : null}
           {active === 'appearance' ? <Appearance {...common} /> : null}
           {active === 'releases' ? <Releases {...common} /> : null}
           {active === 'videos' ? <VideoManager {...common} /> : null}
@@ -625,6 +637,7 @@ export default function Studio() {
           {active === 'merch' ? <Merch {...common} /> : null}
           {active === 'supporters' ? <Orders {...common} /> : null}
           {active === 'messages' ? <Messages {...common} /> : null}
+          {active === 'fans' ? <Fans {...common} /> : null}
           {active === 'newsletter' ? <Newsletter {...common} /> : null}
           {active === 'settings' ? <Settings {...common} /> : null}
         </div>

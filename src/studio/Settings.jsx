@@ -2,6 +2,10 @@ import { useEffect, useState } from 'react';
 import Icon from '../components/Icon';
 import { api } from '../lib/api';
 import { MIN_SUPPORT_PESEWAS, MAX_SUPPORT_PESEWAS, supportMinimum } from '../lib/support';
+import { parseSuggestedAmounts, formatSuggestedAmounts } from '../lib/pricing';
+import { cedis } from '../lib/format';
+
+const cedisFloor = (cedisInput) => cedis(Math.max(MIN_SUPPORT_PESEWAS, Math.round(Number(cedisInput) * 100) || MIN_SUPPORT_PESEWAS));
 
 const NETWORKS = [
   { id: 'mtn', label: 'MTN MoMo' },
@@ -20,6 +24,8 @@ export default function Settings({ data, refresh, toast }) {
     announcement: s.announcement || '',
     supportNote: s.supportNote || '',
     minSupport: supportMinimum(s.minSupport) / 100,
+    supportMode: s.supportMode === 'fixed' ? 'fixed' : 'open',
+    suggestedAmounts: formatSuggestedAmounts(s.suggestedAmounts || []),
     goalAmount: Math.round((s.goalAmount || 0) / 100),
     showRaised: s.showRaised !== false,
     contactEmail: s.contactEmail || '',
@@ -51,6 +57,11 @@ export default function Settings({ data, refresh, toast }) {
         announcement: form.announcement,
         supportNote: form.supportNote,
         minSupport: Math.round(Number(form.minSupport) * 100),
+        supportMode: form.supportMode,
+        suggestedAmounts: parseSuggestedAmounts(
+          form.suggestedAmounts,
+          Math.round(Number(form.minSupport) * 100)
+        ),
         goalAmount: Math.round(Number(form.goalAmount) * 100),
         showRaised: form.showRaised,
         contactEmail: form.contactEmail,
@@ -206,10 +217,53 @@ export default function Settings({ data, refresh, toast }) {
               onChange={(e) => setForm({ ...form, minSupport: e.target.value })}
             />
             <div className="field__hint">
-              One minimum for general support, songs and videos. Fans can give more. Streaming-platform royalties
-              and merch prices are separate.
+              One amount for general support, songs and videos. Streaming-platform royalties and merch prices are
+              separate.
             </div>
           </div>
+
+          <div className="field">
+            <label>Who decides how much fans pay?</label>
+            <div className="price-modes" role="radiogroup" aria-label="Support pricing mode">
+              <button
+                type="button"
+                role="radio"
+                aria-checked={form.supportMode === 'open'}
+                className={`price-mode ${form.supportMode === 'open' ? 'is-active' : ''}`}
+                onClick={() => setForm({ ...form, supportMode: 'open' })}
+              >
+                <strong>Fans choose</strong>
+                <small>{cedisFloor(form.minSupport)} is the minimum — fans can give more.</small>
+              </button>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={form.supportMode === 'fixed'}
+                className={`price-mode ${form.supportMode === 'fixed' ? 'is-active' : ''}`}
+                onClick={() => setForm({ ...form, supportMode: 'fixed' })}
+              >
+                <strong>One set price</strong>
+                <small>Everyone pays exactly {cedisFloor(form.minSupport)}. No amount picker.</small>
+              </button>
+            </div>
+          </div>
+
+          <div className="field">
+            <label htmlFor="s-suggested">Quick amounts (GH₵)</label>
+            <input
+              id="s-suggested"
+              value={form.suggestedAmounts}
+              onChange={(e) => setForm({ ...form, suggestedAmounts: e.target.value })}
+              disabled={form.supportMode === 'fixed'}
+              placeholder="e.g. 20, 50, 100, 250"
+              autoComplete="off"
+            />
+            <div className="field__hint">
+              Comma-separated amounts shown on the support panel and checkout. Leave blank for automatic
+              suggestions. Amounts below the minimum are ignored.
+            </div>
+          </div>
+
           <div className="field">
             <label htmlFor="s-note">Support note</label>
             <textarea

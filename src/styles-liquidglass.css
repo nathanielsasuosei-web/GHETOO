@@ -1,0 +1,304 @@
+/* ==========================================================================
+   Liquid Glass — a site-wide, artist-switchable surface treatment.
+
+   Everything keys off `html[data-glass="on"]` (set by src/lib/glass.js), so
+   turning it off in Studio → Appearance returns to the flat V12 look exactly.
+   The palette still comes from the artist's theme variables: glass only changes
+   how light moves across those colours.
+   ========================================================================== */
+
+html[data-glass="on"] {
+  --lg-blur: 26px;
+  --lg-sat: 175%;
+  --lg-alpha: 0.52;
+  --lg-border: 0.2;
+  --lg-sheen: 0.16;
+  --lg-glow: 0.12;
+  --lg-gold: 0.08;
+  --lg-depth: 0.9;
+}
+
+html[data-glass="on"][data-glass-intensity="subtle"] {
+  --lg-blur: 15px;
+  --lg-sat: 145%;
+  --lg-alpha: 0.66;
+  --lg-border: 0.14;
+  --lg-sheen: 0.09;
+  --lg-glow: 0.07;
+  --lg-gold: 0.04;
+  --lg-depth: 0.7;
+}
+
+html[data-glass="on"][data-glass-intensity="bold"] {
+  --lg-blur: 38px;
+  --lg-sat: 200%;
+  --lg-alpha: 0.38;
+  --lg-border: 0.28;
+  --lg-sheen: 0.24;
+  --lg-glow: 0.2;
+  --lg-gold: 0.13;
+  --lg-depth: 1;
+}
+
+/* ------------------------------------------------------- ambient caustics */
+html[data-glass="on"] body {
+  background-color: var(--v12-bg, var(--ink, #070910));
+}
+
+html[data-glass="on"] body::after {
+  content: '';
+  position: fixed;
+  inset: -25%;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(38% 34% at 18% 14%, rgba(var(--gold-rgb), 0.16), transparent 72%),
+    radial-gradient(42% 38% at 82% 22%, rgba(var(--glow-rgb), 0.2), transparent 74%),
+    radial-gradient(36% 30% at 58% 82%, rgba(var(--gold-soft-rgb), 0.1), transparent 72%),
+    radial-gradient(30% 26% at 8% 70%, rgba(var(--glow-rgb), 0.12), transparent 74%);
+  filter: blur(58px) saturate(135%);
+  opacity: calc(0.55 + var(--lg-depth) * 0.25);
+  animation: lgFloat 26s ease-in-out infinite alternate;
+}
+
+html[data-glass="on"] #root {
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes lgFloat {
+  from { transform: translate3d(-2.5%, -1.5%, 0) scale(1); }
+  to { transform: translate3d(3%, 2.5%, 0) scale(1.09); }
+}
+
+/* ------------------------------------------------------------ glass surfaces */
+html[data-glass="on"] :is(
+  .v12-header,
+  .v12-nav,
+  .v12-mega__inner,
+  .v12-mobile-nav,
+  .hero__card,
+  .support-panel,
+  .support-panel__box,
+  .wall-card,
+  .product-card,
+  .track,
+  .video-card,
+  .event-card,
+  .panel,
+  .stat-card,
+  .modal,
+  .toast,
+  .player,
+  .v12-rail,
+  .v12-topbar,
+  .v12-command,
+  .v12-popover,
+  .v12-pulse__item,
+  .studio-login__card,
+  .site-preview__hero,
+  .upload-drop,
+  .goal,
+  .alert,
+  .branding-card,
+  .media-slot,
+  .account-guest__grid > div,
+  .account-stats > div,
+  .fan-admin-stats > div,
+  .fan-admin-row,
+  .fan-order,
+  .artist-price,
+  .glass-intensity,
+  .price-mode,
+  .account-tabs
+) {
+  background-color: rgba(var(--panel-rgb, 16, 20, 30), var(--lg-alpha));
+  background-image:
+    linear-gradient(135deg, rgba(255, 255, 255, var(--lg-sheen)) 0%, rgba(255, 255, 255, 0.025) 26%, transparent 58%),
+    radial-gradient(120% 90% at 100% -12%, rgba(var(--glow-rgb), var(--lg-glow)), transparent 62%),
+    radial-gradient(95% 85% at -12% 112%, rgba(var(--gold-rgb), var(--lg-gold)), transparent 66%);
+  background-blend-mode: screen, normal, normal;
+  -webkit-backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-sat)) brightness(1.07);
+  backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-sat)) brightness(1.07);
+  border: 1px solid rgba(255, 255, 255, var(--lg-border));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, calc(var(--lg-sheen) + 0.18)),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.02),
+    0 26px 70px -44px rgba(0, 0, 0, calc(0.85 * var(--lg-depth))),
+    0 2px 18px -10px rgba(var(--gold-rgb), 0.16);
+  transition: border-color 0.3s var(--v12-ease, ease), box-shadow 0.3s var(--v12-ease, ease),
+    transform 0.3s var(--v12-ease, ease), background-color 0.3s ease;
+}
+
+/* The studio rail has a more specific background in V12 — restate the glass here. */
+html[data-glass="on"] .studio.v12-studio .studio__side {
+  background-color: rgba(var(--panel-rgb, 16, 20, 30), calc(var(--lg-alpha) + 0.16));
+  background-image:
+    linear-gradient(160deg, rgba(255, 255, 255, var(--lg-sheen)), rgba(255, 255, 255, 0.02) 32%, transparent 62%),
+    radial-gradient(90% 60% at 100% 0%, rgba(var(--glow-rgb), var(--lg-glow)), transparent 70%);
+  -webkit-backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-sat));
+  backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-sat));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24), 18px 0 60px -50px rgba(0, 0, 0, 1);
+}
+
+/* Dialogs and the player need a little more opacity to keep copy legible. */
+html[data-glass="on"] :is(.modal, .player, .v12-command, .v12-popover, .toast) {
+  background-color: rgba(var(--panel-rgb, 16, 20, 30), calc(var(--lg-alpha) + 0.34));
+}
+
+html[data-glass="on"] :is(.track, .video-card, .product-card, .event-card, .wall-card, .hero__card, .panel):hover {
+  border-color: rgba(var(--gold-rgb), 0.38);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, calc(var(--lg-sheen) + 0.22)),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.06),
+    0 30px 80px -44px rgba(0, 0, 0, 0.95),
+    0 6px 26px -14px rgba(var(--gold-rgb), 0.26);
+}
+
+/* The gold announcement strip keeps its colour — glass only adds a sheen. */
+html[data-glass="on"] .v12-header-wrap .notice-bar {
+  background-color: var(--gold);
+  background-image:
+    linear-gradient(105deg, rgba(255, 255, 255, 0.42), transparent 38%),
+    linear-gradient(90deg, var(--gold-deep), var(--gold), var(--gold-soft));
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
+  backdrop-filter: blur(12px) saturate(150%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 14px 30px -24px rgba(var(--gold-rgb), 0.9);
+}
+
+/* A moving specular band across the floating navigation — the "liquid" cue. */
+html[data-glass="on"] .v12-header::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(102deg, transparent 16%, rgba(255, 255, 255, 0.22) 31%, transparent 47%);
+  background-size: 260% 100%;
+  mix-blend-mode: screen;
+  opacity: calc(0.28 + var(--lg-depth) * 0.22);
+  animation: lgSheen 11s ease-in-out infinite;
+}
+
+@keyframes lgSheen {
+  0%, 18% { background-position: 160% 0; }
+  60%, 100% { background-position: -60% 0; }
+}
+
+/* -------------------------------------------------------------- glass controls */
+html[data-glass="on"] :is(
+  .btn--ghost,
+  .icon-btn,
+  .amounts button,
+  .method,
+  .network,
+  .chip,
+  .field input,
+  .field textarea,
+  .field select,
+  .v12-nav__explore-trigger,
+  .v12-nav__explore-trigger:hover,
+  .theme-preset,
+  .media-slot__upload,
+  .copy-row,
+  .upload-drop,
+  .account-chip,
+  .price-mode,
+  .glass-intensity,
+  .theme-field__hex
+) {
+  background-color: rgba(255, 255, 255, 0.055);
+  background-image: linear-gradient(135deg, rgba(255, 255, 255, calc(var(--lg-sheen) + 0.04)), rgba(255, 255, 255, 0.01) 48%, transparent 72%);
+  -webkit-backdrop-filter: blur(calc(var(--lg-blur) * 0.55)) saturate(var(--lg-sat));
+  backdrop-filter: blur(calc(var(--lg-blur) * 0.55)) saturate(var(--lg-sat));
+  border: 1px solid rgba(255, 255, 255, calc(var(--lg-border) * 0.8));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 8px 22px -18px rgba(0, 0, 0, 0.8);
+}
+
+html[data-glass="on"] :is(.amounts button, .method, .network, .chip, .theme-preset, .media-slot__upload, .account-chip, .price-mode, .glass-intensity):hover {
+  border-color: rgba(var(--gold-rgb), 0.52);
+  background-color: rgba(var(--gold-rgb), 0.11);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24), 0 12px 28px -18px rgba(var(--gold-rgb), 0.55);
+}
+
+html[data-glass="on"] .amounts button.is-active,
+html[data-glass="on"] .method.is-active,
+html[data-glass="on"] .network.is-active,
+html[data-glass="on"] .chip.is-active,
+html[data-glass="on"] .price-mode.is-active,
+html[data-glass="on"] .glass-intensity.is-active {
+  border-color: rgba(var(--gold-rgb), 0.72);
+  background-color: rgba(var(--gold-rgb), 0.16);
+  color: var(--gold-soft);
+}
+
+html[data-glass="on"] .btn--gold {
+  background-color: var(--gold);
+  background-image:
+    linear-gradient(112deg, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.06) 32%, rgba(255, 255, 255, 0.12) 66%, rgba(255, 255, 255, 0.3) 100%),
+    linear-gradient(135deg, var(--gold-soft), var(--gold) 58%, var(--gold-deep));
+  -webkit-backdrop-filter: blur(10px) saturate(160%);
+  backdrop-filter: blur(10px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    inset 0 -2px 8px rgba(0, 0, 0, 0.18),
+    0 18px 42px -20px rgba(var(--gold-rgb), 0.95);
+  color: var(--on-gold, #171008);
+}
+
+html[data-glass="on"] .btn--gold:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    inset 0 -2px 8px rgba(0, 0, 0, 0.18),
+    0 24px 52px -20px rgba(var(--gold-rgb), 1);
+}
+
+/* ------------------------------------------------------- light refractions */
+html[data-glass="on"] .hero__title em {
+  text-shadow: 0 0 48px rgba(var(--gold-rgb), 0.5), 2px 0 22px rgba(var(--glow-rgb), 0.22);
+}
+
+html[data-glass="on"] .eyebrow::before {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.7), var(--gold), rgba(var(--gold-rgb), 0));
+}
+
+html[data-glass="on"] .brand__mark,
+html[data-glass="on"] .account-head__avatar,
+html[data-glass="on"] .account-chip__avatar,
+html[data-glass="on"] .fan-admin-row__avatar {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.62), 0 12px 30px -14px rgba(var(--gold-rgb), 0.85);
+}
+
+html[data-glass="on"] .v12-nav > a.is-active,
+html[data-glass="on"] .v12-nav > a:hover {
+  background-color: rgba(255, 255, 255, 0.11);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+html[data-glass="on"] .progress-bar i,
+html[data-glass="on"] .goal__bar i {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 0 22px rgba(var(--gold-rgb), 0.45);
+}
+
+/* ------------------------------------------------------------- accessibility */
+@media (prefers-reduced-motion: reduce) {
+  html[data-glass="on"] body::after,
+  html[data-glass="on"] .v12-header::after {
+    animation: none;
+  }
+}
+
+/* Older browsers without backdrop-filter still get the tint + edge, never an
+   unreadable transparent panel. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  html[data-glass="on"] :is(
+    .v12-header, .v12-nav, .v12-mega__inner, .v12-mobile-nav, .hero__card, .support-panel,
+    .support-panel__box, .wall-card, .product-card, .track, .video-card, .event-card,
+    .panel, .stat-card, .modal, .toast, .player, .studio__side, .v12-topbar, .v12-command,
+    .v12-popover, .v12-pulse__item, .studio-login__card
+  ) {
+    background-color: rgba(var(--panel-rgb, 16, 20, 30), 0.92);
+  }
+}

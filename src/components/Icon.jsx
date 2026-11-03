@@ -206,6 +206,21 @@ const paths = {
     </>
   ),
   bolt: <path d="M13 2 5 13h6l-1 9 8-11h-6l1-9Z" />,
+  user: (
+    <>
+      <circle cx="12" cy="8" r="3.6" />
+      <path d="M4.8 20a7.2 7.2 0 0 1 14.4 0" />
+    </>
+  ),
+  lock: (
+    <>
+      <rect x="4.5" y="10.5" width="15" height="10" rx="2.4" />
+      <path d="M8 10.5V7.6a4 4 0 0 1 8 0v2.9" />
+      <circle cx="12" cy="15.4" r="1.1" fill="currentColor" stroke="none" />
+    </>
+  ),
+  shield: <path d="M12 3 4.5 6v5.5c0 4.5 3.1 7.8 7.5 9.5 4.4-1.7 7.5-5 7.5-9.5V6L12 3Z" />,
+  droplet: <path d="M12 3.2c3 4 5.6 6.8 5.6 10A5.6 5.6 0 0 1 12 18.8a5.6 5.6 0 0 1-5.6-5.6c0-3.2 2.6-6 5.6-10Z" />,
 };
 
 export default function Icon({ name, size = 20, strokeWidth = 1.6, className = '', ...rest }) {
