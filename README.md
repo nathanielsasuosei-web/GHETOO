@@ -18,6 +18,10 @@ No third-party CMS, no label, no gatekeepers. One Node process + a JSON file.
   luminous edges; switch to **Midnight Classic** at any time in Studio → Appearance
 - **Artist-controlled font size:** a 90–125% type scale adjusts headings, labels, paragraphs
   and inline text across the public site from Studio → Appearance
+- **Artist-controlled text style:** four curated typeface pairings (**Studio Serif**,
+  **Editorial**, **Neon Geometry**, **Poster Loud**) re-type every headline, paragraph and
+  label; a pairing's font families are fetched on demand, so the default look costs no
+  extra request on first paint
 - **V12 interface:** floating glass navigation, an expanding hover/focus **Explore** menu,
   refreshed cards, gradients and responsive mobile navigation
 - **Fan accounts:** create an account from **Join** or `/account`, save checkout details,
@@ -68,11 +72,13 @@ No third-party CMS, no label, no gatekeepers. One Node process + a JSON file.
   thumbnail and product photo, at any time. One grid covers all of them; "Use original"
   restores bundled brand imagery
 - **Appearance tab** — choose **Liquid Glass** or **Midnight Classic**, set a 90–125% font
-  size with presets or a slider, then use six one-tap colour presets plus custom accent, glow,
-  background, surface and text pickers. Everything previews live, shows WCAG contrast grades,
-  and saving restyles the whole public site for every visitor (the palette, finish and type
-  scale are stored with `settings`, with a device copy so a lost or not-yet-updated API never
-  silently reverts the owner's choices)
+  size with presets or a slider, pick a **Text style** from four typeface pairings (each card
+  types its own specimen so the pairing can be read before it is published), then use six
+  one-tap colour presets plus custom accent, glow, background, surface and text pickers.
+  Everything previews live, shows WCAG contrast grades, and saving restyles the whole public
+  site for every visitor (the palette, finish, type scale and text style are stored with
+  `settings`, with a device copy so a lost or not-yet-updated API never silently reverts the
+  owner's choices)
 - Edit the artist profile, bio, payout numbers, goal and socials
 
 ---

@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import { DATA_DIR, DATA_DIR_CONFIGURED, BOOT_COUNT } from './db.js';
 
 /** Bump whenever the settings API changes shape (used for stale-deploy checks). */
-export const API_VERSION = '2026-11-03';
+export const API_VERSION = '2026-11-04';
 
 export function capabilities() {
   let writable = false;

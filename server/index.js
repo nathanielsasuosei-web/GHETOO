@@ -7,6 +7,7 @@ import { MUSIC_PLATFORMS, normalizeStreamingUrl, safeStreamingUrl, videoYouTubeU
 import { MIN_SUPPORT_PESEWAS, MAX_SUPPORT_PESEWAS, isValidSupportMinimum, supportMinimum } from '../src/lib/support.js';
 import { sanitizeTheme } from '../src/lib/theme.js';
 import { isValidFontScale } from '../src/lib/typography.js';
+import { isValidFontStyle } from '../src/lib/fontStyle.js';
 import { getState, save, saveNow, UPLOAD_DIR, DATA_DIR, DATA_DIR_CONFIGURED, BOOT_COUNT, id, reference } from './db.js';
 import { capabilities } from './capabilities.js';
 import {
@@ -1089,6 +1090,9 @@ app.patch('/api/admin/settings', (req, res) => {
   if (body.fontScale !== undefined && !isValidFontScale(body.fontScale)) {
     return res.status(400).json({ error: 'Choose a font size from 90% to 125%.' });
   }
+  if (body.fontStyle !== undefined && !isValidFontStyle(body.fontStyle)) {
+    return res.status(400).json({ error: 'Choose one of the available text styles.' });
+  }
   const allowed = [
     'artistName',
     'tagline',
@@ -1105,6 +1109,7 @@ app.patch('/api/admin/settings', (req, res) => {
     'allowCustomSupport',
     'visualStyle',
     'fontScale',
+    'fontStyle',
     'announcement',
     'cardEnabled',
     'goalAmount',
@@ -1115,8 +1120,11 @@ app.patch('/api/admin/settings', (req, res) => {
     if (body[key] !== undefined) state.settings[key] = body[key];
   }
   const now = new Date().toISOString();
-  if (body.visualStyle !== undefined || body.fontScale !== undefined) state.settings.styleUpdatedAt = now;
+  if (body.visualStyle !== undefined || body.fontScale !== undefined || body.fontStyle !== undefined) {
+    state.settings.styleUpdatedAt = now;
+  }
   if (body.fontScale !== undefined) state.settings.fontScaleUpdatedAt = now;
+  if (body.fontStyle !== undefined) state.settings.fontStyleUpdatedAt = now;
   if (Object.keys(body).length) state.settings.siteUpdatedAt = now;
   if (body.theme !== undefined) {
     try {

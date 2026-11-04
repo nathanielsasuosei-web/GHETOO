@@ -23,6 +23,7 @@ Today his sound sits somewhere between Afrobeats and alté — Twi and Pidgin la
     monogramImage: '/media/logo.svg',
     visualStyle: 'liquid',
     fontScale: 100,
+    fontStyle: 'studio',
     momo: {
       mtn: '024 000 0000',
       telecel: '',

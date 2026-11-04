@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import { seedState } from './seed.js';
 import { MIN_SUPPORT_PESEWAS, MAX_SUPPORT_PESEWAS } from '../src/lib/support.js';
 import { normalizeFontScale } from '../src/lib/typography.js';
+import { normalizeFontStyle } from '../src/lib/fontStyle.js';
 
 const ROOT = process.cwd();
 /** Explicit DATA_DIR means the host is expected to mount a persistent volume there. */
@@ -89,6 +90,7 @@ export function getState() {
   state.settings.allowCustomSupport = state.settings.allowCustomSupport !== false;
   state.settings.visualStyle = state.settings.visualStyle === 'classic' ? 'classic' : 'liquid';
   state.settings.fontScale = normalizeFontScale(state.settings.fontScale);
+  state.settings.fontStyle = normalizeFontStyle(state.settings.fontStyle);
   return state;
 }
 

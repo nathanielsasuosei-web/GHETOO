@@ -3,6 +3,7 @@ import { api } from '../lib/api';
 import { applyTheme, resolveTheme } from '../lib/theme';
 import { applyVisualStyle, resolveVisualStyle } from '../lib/visualStyle';
 import { applyFontScale, resolveFontScale } from '../lib/typography';
+import { applyFontStyle, ensureFontStyleFonts, resolveFontStyle } from '../lib/fontStyle';
 
 const SiteContext = createContext(null);
 
@@ -53,15 +54,18 @@ export function SiteProvider({ children }) {
     document.title = `${site.settings.artistName} — Music from ${site.settings.city?.split(',')[0] || 'Accra'}`;
   }, [site]);
 
-  // The owner's saved colours and finish restyle the whole site.
+  // The owner's saved colours, finish and type restyle the whole site.
   useEffect(() => {
     const settings = site?.settings;
     const palette = resolveTheme(settings).theme;
     const visual = resolveVisualStyle(settings).style;
     const fontScale = resolveFontScale(settings).scale;
+    const fontStyle = resolveFontStyle(settings).style;
     applyTheme(palette);
     applyVisualStyle(visual);
     applyFontScale(fontScale);
+    applyFontStyle(fontStyle);
+    ensureFontStyleFonts(fontStyle);
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute('content', palette.background);
 
@@ -82,6 +86,8 @@ export function SiteProvider({ children }) {
     site?.settings?.styleUpdatedAt,
     site?.settings?.fontScale,
     site?.settings?.fontScaleUpdatedAt,
+    site?.settings?.fontStyle,
+    site?.settings?.fontStyleUpdatedAt,
     site?.settings?.logoImage,
     site?.settings?.siteImagesUpdatedAt,
   ]);
