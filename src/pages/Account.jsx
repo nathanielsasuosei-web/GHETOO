@@ -1,97 +1,53 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import Icon from '../components/Icon';
 import { useFan } from '../context/FanContext';
 import { useSite } from '../context/SiteContext';
-import { useSupport } from '../context/SupportContext';
 import { useToast } from '../context/ToastContext';
-import { cedis, longDate, initials } from '../lib/format';
-import { api } from '../lib/api';
+import { cedis, longDate } from '../lib/format';
 
-const STATUS = {
-  paid: { label: 'Confirmed', tone: 'paid' },
-  pending: { label: 'Awaiting confirmation', tone: 'pending' },
-  cancelled: { label: 'Cancelled', tone: 'cancelled' },
-};
-
-function Guest() {
-  const { openAuth } = useFan();
-  return (
-    <div className="account-guest">
-      <span className="eyebrow">Your corner of the music</span>
-      <h1 className="display">Keep every cedi<br /><em>you gave close.</em></h1>
-      <p>
-        Create a free fan account to keep your support, downloads and merch orders together. Checkout fills itself
-        in, and your receipt is always one click away.
-      </p>
-      <div className="account-guest__actions">
-        <button className="btn btn--gold btn--lg" onClick={() => openAuth('signup')}>
-          <Icon name="user" size={17} /> Create a free account
-        </button>
-        <button className="btn btn--ghost btn--lg" onClick={() => openAuth('signin')}>
-          I already have one
-        </button>
-      </div>
-      <div className="account-guest__grid">
-        <div><Icon name="wallet" size={18} /><strong>One place for support</strong><small>Every contribution and its status.</small></div>
-        <div><Icon name="download" size={18} /><strong>Downloads that stay</strong><small>Come back for the records you supported.</small></div>
-        <div><Icon name="bolt" size={18} /><strong>Quicker checkout</strong><small>Your name and email, remembered.</small></div>
-      </div>
-    </div>
-  );
-}
-
-function OrderRow({ order }) {
-  const status = STATUS[order.status] || STATUS.pending;
-  const isMerch = order.kind === 'merch';
-  return (
-    <div className="fan-order">
-      <span className={`fan-order__icon ${isMerch ? 'is-merch' : ''}`}>
-        <Icon name={isMerch ? 'bag' : 'heart'} size={17} />
-      </span>
-      <div className="fan-order__copy">
-        <strong>{isMerch ? order.items?.map((line) => line.title).join(', ') : order.trackTitle || 'General support'}</strong>
-        <small>
-          {longDate(order.createdAt)} · {order.reference}
-          {isMerch ? ' · merch order' : order.method === 'card' ? ' · card' : ' · mobile money'}
-        </small>
-      </div>
-      <span className={`badge-status badge-status--${status.tone}`}>{status.label}</span>
-      <strong className="fan-order__amount">{cedis(order.amount)}</strong>
-      <div className="fan-order__links">
-        <Link to={`/thank-you?ref=${encodeURIComponent(order.reference)}`} className="link-arrow">Receipt</Link>
-        {order.downloadToken ? (
-          <a href={`/api/download/${order.downloadToken}`} className="link-arrow">Download</a>
-        ) : null}
-      </div>
-    </div>
-  );
+function orderSummary(order) {
+  return (order.items || [])
+    .map((line) => `${line.title}${line.size ? ` (${line.size})` : ''} ×${line.qty || 1}`)
+    .join(', ');
 }
 
 export default function Account() {
+  const {
+    fan,
+    orders,
+    merchOrders,
+    loading,
+    refresh,
+    logout,
+    openAuth,
+    saveProfile,
+  } = useFan();
   const { site } = useSite();
-  const { fan, orders, loading, signOut, updateProfile, refreshOrders } = useFan();
-  const { openSupport } = useSupport();
   const { toast } = useToast();
-  const [profile, setProfile] = useState({ name: '', email: '', phone: '' });
-  const [passwords, setPasswords] = useState({ currentPassword: '', password: '' });
+  const navigate = useNavigate();
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
   const [busy, setBusy] = useState(false);
-  const [passwordBusy, setPasswordBusy] = useState(false);
+  const [leaving, setLeaving] = useState(false);
 
   useEffect(() => {
-    if (fan) setProfile({ name: fan.name || '', email: fan.email || '', phone: fan.phone || '' });
-  }, [fan]);
+    setName(fan?.name || '');
+    setPhone(fan?.phone || '');
+  }, [fan?.name, fan?.phone]);
 
   useEffect(() => {
-    if (fan) refreshOrders();
-  }, [fan, refreshOrders]);
+    if (fan?.id) refresh();
+    // Only re-read history when the signed-in account changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fan?.id]);
 
-  const saveProfile = async (event) => {
+  const save = async (event) => {
     event.preventDefault();
     setBusy(true);
     try {
-      await updateProfile(profile);
-      toast('Your details are saved');
+      await saveProfile({ name, phone });
+      toast('Profile saved');
     } catch (err) {
       toast(err.message, 'error');
     } finally {
@@ -99,131 +55,224 @@ export default function Account() {
     }
   };
 
-  const changePassword = async (event) => {
-    event.preventDefault();
-    setPasswordBusy(true);
+  const signOut = async () => {
+    setLeaving(true);
     try {
-      await api.changeFanPassword(passwords);
-      setPasswords({ currentPassword: '', password: '' });
-      toast('Password updated');
-    } catch (err) {
-      toast(err.message, 'error');
-    } finally {
-      setPasswordBusy(false);
-    }
-  };
-
-  const leave = async () => {
-    try {
-      await signOut();
+      await logout();
       toast('Signed out');
+      navigate('/');
     } catch (err) {
       toast(err.message, 'error');
+      setLeaving(false);
     }
   };
 
-  const artistName = site?.settings?.artistName || 'Young Silence';
-  const paid = orders.filter((order) => order.status === 'paid');
-  const total = paid.reduce((sum, order) => sum + (order.amount || 0), 0);
+  if (loading) {
+    return (
+      <section className="page-hero account-guest">
+        <div className="container">
+          <div className="loader" />
+        </div>
+      </section>
+    );
+  }
 
-  return (
-    <div className="container account-page">
-      {!fan ? (
-        loading ? <div className="account-loading"><div className="loader" /></div> : <Guest />
-      ) : (
-        <>
-          <div className="account-head">
-            <div className="account-head__avatar">{initials(fan.name) || 'F'}</div>
-            <div>
-              <span className="eyebrow">Fan account</span>
-              <h1 className="display">Hi, {fan.name.split(/\s+/)[0]}.</h1>
-              <p>Everything you’ve done for {artistName}, in one quiet place.</p>
-            </div>
-            <button className="btn btn--ghost btn--sm" onClick={leave}>
-              <Icon name="logout" size={15} /> Sign out
+  if (!fan) {
+    return (
+      <section className="page-hero account-guest">
+        <div className="container account-guest__inner">
+          <span className="eyebrow">Fan account</span>
+          <h1>
+            Your place in
+            <br />
+            <em>the music.</em>
+          </h1>
+          <p>
+            Create a free account to save your name and email at checkout, keep track of support, and find eligible
+            download links again. No subscription and no paywall — just a closer connection to the art.
+          </p>
+          <div className="account-guest__actions">
+            <button className="btn btn--gold btn--lg" onClick={() => openAuth('register')}>
+              <Icon name="sparkle" size={17} /> Create account
+            </button>
+            <button className="btn btn--ghost btn--lg" onClick={() => openAuth('login')}>
+              <Icon name="lock" size={16} /> I already have one
             </button>
           </div>
-
-          <div className="account-stats">
-            <div><span>Orders</span><strong>{orders.length}</strong><small>support + merch</small></div>
-            <div><span>Confirmed</span><strong>{cedis(total)}</strong><small>total given</small></div>
-            <div><span>Member since</span><strong>{longDate(fan.createdAt)}</strong><small>part of the circle</small></div>
+          <div className="account-benefits">
+            <span><Icon name="check" size={14} /> Faster checkout</span>
+            <span><Icon name="check" size={14} /> Support history</span>
+            <span><Icon name="check" size={14} /> Download links</span>
           </div>
+        </div>
+      </section>
+    );
+  }
 
-          <div className="account-grid">
-            <section className="panel">
-              <div className="panel__head">
-                <div><h3>Your details</h3><p>Used to fill in checkout for you.</p></div>
-              </div>
-              <form onSubmit={saveProfile} className="account-form">
-                <div className="field">
-                  <label htmlFor="ac-name">Name</label>
-                  <input id="ac-name" value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} maxLength={80} required />
-                </div>
-                <div className="field-row">
-                  <div className="field">
-                    <label htmlFor="ac-email">Email</label>
-                    <input id="ac-email" type="email" value={profile.email} onChange={(e) => setProfile({ ...profile, email: e.target.value })} maxLength={160} required />
-                  </div>
-                  <div className="field">
-                    <label htmlFor="ac-phone">Phone</label>
-                    <input id="ac-phone" value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: e.target.value })} maxLength={30} placeholder="024 000 0000" />
-                  </div>
-                </div>
-                <button className="btn btn--gold btn--sm" disabled={busy}>
-                  <Icon name="check" size={15} /> {busy ? 'Saving…' : 'Save details'}
-                </button>
-              </form>
-            </section>
-
-            <section className="panel">
-              <div className="panel__head">
-                <div><h3>Security</h3><p>Change your password any time.</p></div>
-              </div>
-              <form onSubmit={changePassword} className="account-form">
-                <div className="field">
-                  <label htmlFor="ac-current">Current password</label>
-                  <input id="ac-current" type="password" value={passwords.currentPassword} onChange={(e) => setPasswords({ ...passwords, currentPassword: e.target.value })} autoComplete="current-password" required />
-                </div>
-                <div className="field">
-                  <label htmlFor="ac-new">New password</label>
-                  <input id="ac-new" type="password" minLength={8} maxLength={128} value={passwords.password} onChange={(e) => setPasswords({ ...passwords, password: e.target.value })} autoComplete="new-password" required />
-                  <div className="field__hint">At least 8 characters.</div>
-                </div>
-                <button className="btn btn--ghost btn--sm" disabled={passwordBusy}>
-                  <Icon name="lock" size={15} /> {passwordBusy ? 'Updating…' : 'Update password'}
-                </button>
-              </form>
-            </section>
-          </div>
-
-          <section className="panel account-history">
-            <div className="panel__head">
-              <div>
-                <h3>Your support & orders</h3>
-                <p>Orders placed while signed in show up here. Older receipts are still available by reference.</p>
-              </div>
-              <button className="btn btn--gold btn--sm" onClick={() => openSupport()}>
-                <Icon name="heart" size={15} /> Support again
-              </button>
-            </div>
-            {orders.length ? (
-              <div className="fan-orders">{orders.map((order) => <OrderRow key={`${order.kind}-${order.reference}`} order={order} />)}</div>
-            ) : (
-              <div className="account-empty">
-                <Icon name="heart" size={22} />
-                <strong>Nothing here yet.</strong>
-                <p>When you support the music or pick up merch while signed in, it will appear here.</p>
-                <button className="btn btn--ghost btn--sm" onClick={() => openSupport()}>Support the music</button>
-              </div>
-            )}
-          </section>
-
-          <p className="field__hint" style={{ marginTop: 18 }}>
-            <Icon name="shield" size={12} /> Only you and the artist studio can see orders linked to this account.
+  return (
+    <>
+      <section className="page-hero account-hero">
+        <div className="container">
+          <span className="eyebrow">Fan account</span>
+          <h1>
+            Medaase,
+            <br />
+            <em>{fan.name.split(/\s+/)[0]}.</em>
+          </h1>
+          <p>
+            Every {site?.settings?.artistName || 'Young Silence'} order placed while you are signed in appears here.
+            Your details are filled in automatically when you support the music or shop.
           </p>
-        </>
-      )}
-    </div>
+        </div>
+      </section>
+
+      <section className="section section--tight account-page">
+        <div className="container account-grid">
+          <div className="account-side">
+            <form className="panel account-card" onSubmit={save}>
+              <div className="panel__head">
+                <div>
+                  <h3>Your details</h3>
+                  <p>Signed in as {fan.email}</p>
+                </div>
+                <span className="account-avatar">
+                  <Icon name="user" size={21} />
+                </span>
+              </div>
+              <div className="field">
+                <label htmlFor="account-name">Display name</label>
+                <input
+                  id="account-name"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  maxLength={80}
+                  minLength={2}
+                  required
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="account-phone">Phone (optional)</label>
+                <input
+                  id="account-phone"
+                  value={phone}
+                  onChange={(event) => setPhone(event.target.value)}
+                  maxLength={30}
+                  placeholder="024 000 0000"
+                />
+              </div>
+              <button className="btn btn--gold btn--block" disabled={busy}>
+                <Icon name="check" size={15} /> {busy ? 'Saving…' : 'Save profile'}
+              </button>
+              <button type="button" className="btn btn--ghost btn--block" onClick={signOut} disabled={leaving}>
+                <Icon name="logout" size={15} /> {leaving ? 'Signing out…' : 'Sign out'}
+              </button>
+            </form>
+
+            <div className="panel account-card account-card--note">
+              <span className="eyebrow">What an account does</span>
+              <ul className="account-list">
+                <li><Icon name="check" size={14} /> Prefills support and merch checkout</li>
+                <li><Icon name="check" size={14} /> Keeps support and merch receipts together</li>
+                <li><Icon name="check" size={14} /> Reopens eligible music download links</li>
+                <li><Icon name="check" size={14} /> Never gates the music behind a subscription</li>
+              </ul>
+              <Link to="/support" className="link-arrow">
+                Support the music <Icon name="arrow" size={14} />
+              </Link>
+            </div>
+          </div>
+
+          <div className="account-history">
+            <div className="panel account-card">
+              <div className="panel__head">
+                <div>
+                  <h3>Support history</h3>
+                  <p>{orders.length} order{orders.length === 1 ? '' : 's'} placed while signed in.</p>
+                </div>
+              </div>
+              {orders.length ? (
+                <div className="table-wrap">
+                  <table className="table account-table">
+                    <thead>
+                      <tr>
+                        <th>Reference</th>
+                        <th>Supporting</th>
+                        <th>Amount</th>
+                        <th>Date</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {orders.map((order) => (
+                        <tr key={order.reference}>
+                          <td>
+                            <code>{order.reference}</code>
+                            {order.downloadToken ? (
+                              <a className="account-download" href={`/api/download/${order.downloadToken}`}>
+                                <Icon name="download" size={12} /> Download
+                              </a>
+                            ) : null}
+                          </td>
+                          <td>{order.trackTitle || 'General support'}</td>
+                          <td>{cedis(order.amount)}</td>
+                          <td>{longDate(order.createdAt)}</td>
+                          <td><span className={`badge-status badge-status--${order.status}`}>{order.status}</span></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="empty">
+                  No support orders yet. When you give while signed in, your reference will live here.
+                </div>
+              )}
+            </div>
+
+            <div className="panel account-card">
+              <div className="panel__head">
+                <div>
+                  <h3>Merch orders</h3>
+                  <p>{merchOrders.length} store order{merchOrders.length === 1 ? '' : 's'}.</p>
+                </div>
+              </div>
+              {merchOrders.length ? (
+                <div className="table-wrap">
+                  <table className="table account-table">
+                    <thead>
+                      <tr>
+                        <th>Reference</th>
+                        <th>Items</th>
+                        <th>Amount</th>
+                        <th>Date</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {merchOrders.map((order) => (
+                        <tr key={order.reference}>
+                          <td><code>{order.reference}</code></td>
+                          <td>{orderSummary(order)}</td>
+                          <td>{cedis(order.amount)}</td>
+                          <td>{longDate(order.createdAt)}</td>
+                          <td><span className={`badge-status badge-status--${order.status}`}>{order.status}</span></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="empty">No merch orders yet. Your delivery references will appear here.</div>
+              )}
+            </div>
+
+            <p className="field__hint">
+              For privacy, older orders placed before you signed in are not linked automatically. Keep the
+              <code> YS-XXXXXX </code> reference if you need help with one of those.
+            </p>
+          </div>
+        </div>
+      </section>
+    </>
   );
 }

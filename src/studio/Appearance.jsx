@@ -17,7 +17,24 @@ import {
   themeReport,
   themeVars,
 } from '../lib/theme';
-import { GLASS_INTENSITIES, applyGlass, glassMatches, normalizeGlass } from '../lib/glass';
+import {
+  VISUAL_STYLE_CHOICES,
+  applyVisualStyle,
+  normalizeVisualStyle,
+  resolveVisualStyle,
+  storeVisualStyle,
+} from '../lib/visualStyle';
+import {
+  DEFAULT_FONT_SCALE,
+  FONT_SCALE_CHOICES,
+  FONT_SCALE_MAX,
+  FONT_SCALE_MIN,
+  FONT_SCALE_STEP,
+  applyFontScale,
+  normalizeFontScale,
+  resolveFontScale,
+  storeFontScale,
+} from '../lib/typography';
 
 const pct = (ratio) => `${ratio.toFixed(1)}:1`;
 
@@ -30,9 +47,13 @@ function ContrastChip({ label, grade }) {
   );
 }
 
-function Preview({ theme }) {
+function Preview({ theme, style }) {
   return (
-    <div className="theme-preview" style={themeVars(theme)} aria-hidden="true">
+    <div
+      className={`theme-preview ${style === 'liquid' ? 'theme-preview--liquid' : ''}`}
+      style={themeVars(theme)}
+      aria-hidden="true"
+    >
       <div className="theme-preview__glow" />
       <div className="theme-preview__bar">
         <span className="theme-preview__mark">YS</span>
@@ -61,17 +82,22 @@ function Preview({ theme }) {
 
 export default function Appearance({ data, refresh, toast }) {
   const resolved = useMemo(() => resolveTheme(data.settings), [data.settings]);
+  const resolvedStyle = useMemo(() => resolveVisualStyle(data.settings), [data.settings]);
+  const resolvedFont = useMemo(() => resolveFontScale(data.settings), [data.settings]);
   const saved = resolved.theme;
+  const savedStyle = normalizeVisualStyle(resolvedStyle.style);
+  const savedFontScale = normalizeFontScale(resolvedFont.scale);
   const [draft, setDraft] = useState(saved);
+  const [style, setStyle] = useState(savedStyle);
+  const [fontScale, setFontScale] = useState(savedFontScale);
   const [typing, setTyping] = useState({});
   const [busy, setBusy] = useState(false);
-  const savedGlass = normalizeGlass(data.settings);
-  const [glassDraft, setGlassDraft] = useState(savedGlass);
-  const [glassBusy, setGlassBusy] = useState(false);
   const savedRef = useRef(saved);
-  const savedGlassRef = useRef(savedGlass);
+  const savedStyleRef = useRef(savedStyle);
+  const savedFontScaleRef = useRef(savedFontScale);
   savedRef.current = saved;
-  savedGlassRef.current = savedGlass;
+  savedStyleRef.current = savedStyle;
+  savedFontScaleRef.current = savedFontScale;
 
   useEffect(() => {
     setDraft(saved);
@@ -79,25 +105,36 @@ export default function Appearance({ data, refresh, toast }) {
   }, [saved]);
 
   useEffect(() => {
-    setGlassDraft(normalizeGlass(data.settings));
-  }, [data.settings]);
+    setStyle(savedStyle);
+  }, [savedStyle]);
+
+  useEffect(() => {
+    setFontScale(savedFontScale);
+  }, [savedFontScale]);
 
   // Live preview: the studio (and the public site behind it) recolours as you drag.
   useEffect(() => {
     applyTheme(draft);
   }, [draft]);
 
-  useEffect(() => () => applyTheme(savedRef.current), []);
-
-  // Liquid Glass previews live too; leaving the tab without saving restores the
-  // published look instead of leaving this browser out of sync.
   useEffect(() => {
-    applyGlass(glassDraft);
-  }, [glassDraft]);
-  useEffect(() => () => applyGlass(savedGlassRef.current), []);
+    applyVisualStyle(style);
+  }, [style]);
 
-  const glassDirty = !glassMatches(glassDraft, savedGlass);
-  const dirty = !themeMatches(draft, saved);
+  useEffect(() => {
+    applyFontScale(fontScale);
+  }, [fontScale]);
+
+  useEffect(
+    () => () => {
+      applyTheme(savedRef.current);
+      applyVisualStyle(savedStyleRef.current);
+      applyFontScale(savedFontScaleRef.current);
+    },
+    []
+  );
+
+  const dirty = !themeMatches(draft, saved) || style !== savedStyle || fontScale !== savedFontScale;
   // True when this browser is showing a palette the API has not stored yet.
   const deviceOnly = resolved.source === 'device' && !themeMatches(saved, data.settings.theme);
   // The current backend advertises its build and storage in /api/site and
@@ -137,7 +174,7 @@ export default function Appearance({ data, refresh, toast }) {
     setBusy(true);
     const palette = normalizeTheme(draft);
     try {
-      const response = await api.saveSettings({ theme: palette });
+      const response = await api.saveSettings({ theme: palette, visualStyle: style, fontScale });
       // The PATCH echo is not proof of publication: an older API answers 200
       // while silently dropping `theme`. Check what an anonymous visitor gets.
       let publicSite = null;
@@ -147,19 +184,20 @@ export default function Appearance({ data, refresh, toast }) {
       } catch {
         checkFailed = true;
       }
-      const accepted = checkFailed
-        ? themePublished(response, palette)
-        : themePublished(publicSite, palette);
-      // Keep a device copy either way, so a reload never loses the palette while
-      // an older API (or a redeploy that reset the JSON file) catches up.
-      storeTheme(
-        palette,
-        accepted ? response?.settings?.themeUpdatedAt || publicSite?.settings?.themeUpdatedAt || undefined : undefined
-      );
-      if (accepted) {
-        toast('Colours published — every visitor now sees this palette');
+      const settings = (checkFailed ? response : publicSite)?.settings;
+      const themeAccepted = themePublished(checkFailed ? response : publicSite, palette);
+      const styleAccepted = settings?.visualStyle === style;
+      const fontAccepted = settings?.fontScale === fontScale;
+      const allAccepted = themeAccepted && styleAccepted && fontAccepted;
+      // Keep device copies either way, so a reload never loses the owner's choices
+      // while an older API (or a redeploy with a reset JSON file) catches up.
+      storeTheme(palette, themeAccepted ? response?.settings?.themeUpdatedAt || settings?.themeUpdatedAt || undefined : undefined);
+      storeVisualStyle(style, styleAccepted ? response?.settings?.styleUpdatedAt || settings?.styleUpdatedAt || undefined : undefined);
+      storeFontScale(fontScale, fontAccepted ? response?.settings?.fontScaleUpdatedAt || settings?.fontScaleUpdatedAt || undefined : undefined);
+      if (allAccepted) {
+        toast('Appearance published — every visitor now sees these colours, finish and font size');
       } else {
-        toast('Colours saved on this device only. Deploy the latest backend with a persistent DATA_DIR, then press Publish colours.', 'error');
+        toast('Saved on this device only. Deploy the latest backend with a persistent DATA_DIR, then press Publish colours.', 'error');
       }
       await refresh();
     } catch (err) {
@@ -169,47 +207,126 @@ export default function Appearance({ data, refresh, toast }) {
     }
   };
 
-  const saveGlass = async () => {
-    setGlassBusy(true);
-    try {
-      await api.saveSettings({
-        liquidGlass: glassDraft.liquidGlass,
-        glassIntensity: glassDraft.glassIntensity,
-      });
-      applyGlass(glassDraft);
-      toast(glassDraft.liquidGlass ? 'Liquid Glass published for every visitor' : 'Liquid Glass turned off');
-      await refresh();
-    } catch (err) {
-      toast(err.message, 'error');
-    } finally {
-      setGlassBusy(false);
-    }
-  };
-
   return (
     <form className="appearance" onSubmit={save}>
       <div className="studio__top">
         <div>
           <h1>Appearance</h1>
-          <p>Colour control for the public site. Everything previews live — save to publish it.</p>
+          <p>Choose the Liquid Glass finish, font size and colour palette for the public site. Everything previews live.</p>
         </div>
         <div className="appearance__actions">
-          <button type="button" className="btn btn--ghost btn--sm" onClick={() => setDraft(saved)} disabled={!dirty || busy}>
+          <button
+            type="button"
+            className="btn btn--ghost btn--sm"
+            onClick={() => {
+              setDraft(saved);
+              setStyle(savedStyle);
+              setFontScale(savedFontScale);
+            }}
+            disabled={!dirty || busy}
+          >
             <Icon name="arrow" size={14} style={{ transform: 'rotate(180deg)' }} />
             Revert
           </button>
-          <button type="button" className="btn btn--ghost btn--sm" onClick={() => setDraft({ ...THEME_DEFAULTS })} disabled={busy}>
+          <button
+            type="button"
+            className="btn btn--ghost btn--sm"
+            onClick={() => {
+              setDraft({ ...THEME_DEFAULTS });
+              setStyle('liquid');
+              setFontScale(DEFAULT_FONT_SCALE);
+            }}
+            disabled={busy}
+          >
             Reset default
           </button>
           <button className="btn btn--gold btn--sm" disabled={(!dirty && !deviceOnly) || busy}>
             <Icon name="check" size={15} />
-            {busy ? 'Saving…' : deviceOnly && !dirty ? 'Publish colours' : 'Save colours'}
+            {busy ? 'Saving…' : deviceOnly && !dirty ? 'Publish colours' : 'Save appearance'}
           </button>
         </div>
       </div>
 
       <div className="appearance__grid">
         <div className="appearance__col">
+          <section className="panel visual-style-panel">
+            <div className="panel__head">
+              <div>
+                <h3>Visual finish</h3>
+                <p>Choose how light, blur and colour move through every surface.</p>
+              </div>
+              {style === 'liquid' ? <span className="badge-status badge-status--live">Liquid Glass</span> : null}
+            </div>
+            <div className="visual-style-grid">
+              {VISUAL_STYLE_CHOICES.map((choice) => (
+                <button
+                  key={choice.id}
+                  type="button"
+                  className={`visual-style-card ${style === choice.id ? 'is-active' : ''}`}
+                  onClick={() => setStyle(choice.id)}
+                  aria-pressed={style === choice.id}
+                >
+                  <span className={`visual-style-card__swatch visual-style-card__swatch--${choice.id}`} aria-hidden="true">
+                    <i /><i /><i />
+                  </span>
+                  <span className="visual-style-card__copy">
+                    <strong>{choice.name}</strong>
+                    <small>{choice.note}</small>
+                  </span>
+                  {style === choice.id ? <Icon name="check" size={15} /> : null}
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section className="panel font-scale-panel">
+            <div className="panel__head">
+              <div>
+                <h3>Font size</h3>
+                <p>Scale every heading, label and paragraph across the public site.</p>
+              </div>
+              <span className="font-scale-badge">{fontScale}%</span>
+            </div>
+            <div className="font-scale-control">
+              <label htmlFor="font-scale-range">Type scale</label>
+              <input
+                id="font-scale-range"
+                type="range"
+                min={FONT_SCALE_MIN}
+                max={FONT_SCALE_MAX}
+                step={FONT_SCALE_STEP}
+                value={fontScale}
+                onChange={(event) => setFontScale(Number(event.target.value))}
+                aria-valuetext={`${fontScale} percent`}
+              />
+              <div className="font-scale-range-labels">
+                <span>{FONT_SCALE_MIN}%</span>
+                <span>{DEFAULT_FONT_SCALE}%</span>
+                <span>{FONT_SCALE_MAX}%</span>
+              </div>
+            </div>
+            <div className="font-scale-presets">
+              {FONT_SCALE_CHOICES.map((choice) => (
+                <button
+                  key={choice.value}
+                  type="button"
+                  className={fontScale === choice.value ? 'is-active' : ''}
+                  onClick={() => setFontScale(choice.value)}
+                  aria-pressed={fontScale === choice.value}
+                  title={choice.note}
+                >
+                  <strong>{choice.label}</strong>
+                  <small>{choice.value}%</small>
+                </button>
+              ))}
+            </div>
+            <div className="font-scale-preview" aria-label={`Font size preview at ${fontScale}%`}>
+              <span className="eyebrow eyebrow--plain">Live type preview</span>
+              <strong>Accra Nights</strong>
+              <p>Afro-fusion from the heart of Accra. Warm guitars, talking drums, 808s.</p>
+            </div>
+          </section>
+
           <section className="panel">
             <div className="panel__head">
               <div>
@@ -237,52 +354,6 @@ export default function Appearance({ data, refresh, toast }) {
                   {activePreset === preset.id ? <Icon name="check" size={14} /> : null}
                 </button>
               ))}
-            </div>
-          </section>
-
-          <section className="panel glass-panel">
-            <div className="panel__head">
-              <div>
-                <h3>Liquid Glass</h3>
-                <p>Refractive, translucent surfaces with soft caustics and specular edges. Applies to the whole site.</p>
-              </div>
-              <span className="badge-status badge-status--live">Site-wide</span>
-            </div>
-            <div className="toggle-row">
-              <div>
-                <strong>Enable Liquid Glass</strong>
-                <small>Turn off to return to the flat V12 surfaces.</small>
-              </div>
-              <button
-                type="button"
-                className={`switch ${glassDraft.liquidGlass ? 'is-on' : ''}`}
-                onClick={() => setGlassDraft((current) => ({ ...current, liquidGlass: !current.liquidGlass }))}
-                aria-label="Toggle Liquid Glass"
-                aria-pressed={glassDraft.liquidGlass}
-              />
-            </div>
-            <span className="field__hint" style={{ display: 'block', margin: '18px 0 10px' }}>Intensity</span>
-            <div className="glass-intensities">
-              {GLASS_INTENSITIES.map((option) => (
-                <button
-                  key={option.id}
-                  type="button"
-                  className={`glass-intensity ${glassDraft.glassIntensity === option.id ? 'is-active' : ''}`}
-                  onClick={() => setGlassDraft((current) => ({ ...current, liquidGlass: true, glassIntensity: option.id }))}
-                  aria-pressed={glassDraft.glassIntensity === option.id && glassDraft.liquidGlass}
-                  disabled={!glassDraft.liquidGlass}
-                >
-                  <Icon name="droplet" size={16} />
-                  <strong>{option.name}</strong>
-                  <small>{option.note}</small>
-                </button>
-              ))}
-            </div>
-            <div className="glass-savebar">
-              <span>{glassDirty ? 'Unsaved glass changes — previewing on this device.' : 'Glass matches the live site.'}</span>
-              <button type="button" className="btn btn--gold btn--sm" onClick={saveGlass} disabled={!glassDirty || glassBusy}>
-                <Icon name="check" size={15} /> {glassBusy ? 'Saving…' : 'Save liquid glass'}
-              </button>
             </div>
           </section>
 
@@ -375,7 +446,7 @@ export default function Appearance({ data, refresh, toast }) {
               </div>
               {dirty ? <span className="theme-unsaved">Unsaved</span> : null}
             </div>
-            <Preview theme={draft} />
+            <Preview theme={draft} style={style} />
             <div className="theme-swatches">
               {THEME_CONTROLS.map((control) => (
                 <span key={control.key} title={`${control.label} ${draft[control.key]}`}>
@@ -401,14 +472,14 @@ export default function Appearance({ data, refresh, toast }) {
       <div className={`appearance__savebar ${deviceOnly ? 'is-device' : ''}`}>
         <span>
           {dirty
-            ? 'You have unsaved colour changes.'
+            ? 'You have unsaved appearance changes.'
             : deviceOnly
               ? 'Saved on this device — deploy the latest backend with a persistent DATA_DIR, then publish.'
-              : 'Colours match the live site.'}
+              : 'The live site matches this appearance.'}
         </span>
         <button className="btn btn--gold btn--sm" disabled={(!dirty && !deviceOnly) || busy}>
           <Icon name="check" size={15} />
-          {busy ? 'Saving…' : deviceOnly && !dirty ? 'Publish colours' : 'Save colours'}
+          {busy ? 'Saving…' : deviceOnly && !dirty ? 'Publish colours' : 'Save appearance'}
         </button>
       </div>
     </form>

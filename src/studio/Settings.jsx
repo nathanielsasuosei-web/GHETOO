@@ -2,10 +2,6 @@ import { useEffect, useState } from 'react';
 import Icon from '../components/Icon';
 import { api } from '../lib/api';
 import { MIN_SUPPORT_PESEWAS, MAX_SUPPORT_PESEWAS, supportMinimum } from '../lib/support';
-import { parseSuggestedAmounts, formatSuggestedAmounts } from '../lib/pricing';
-import { cedis } from '../lib/format';
-
-const cedisFloor = (cedisInput) => cedis(Math.max(MIN_SUPPORT_PESEWAS, Math.round(Number(cedisInput) * 100) || MIN_SUPPORT_PESEWAS));
 
 const NETWORKS = [
   { id: 'mtn', label: 'MTN MoMo' },
@@ -24,8 +20,7 @@ export default function Settings({ data, refresh, toast }) {
     announcement: s.announcement || '',
     supportNote: s.supportNote || '',
     minSupport: supportMinimum(s.minSupport) / 100,
-    supportMode: s.supportMode === 'fixed' ? 'fixed' : 'open',
-    suggestedAmounts: formatSuggestedAmounts(s.suggestedAmounts || []),
+    allowCustomSupport: s.allowCustomSupport !== false,
     goalAmount: Math.round((s.goalAmount || 0) / 100),
     showRaised: s.showRaised !== false,
     contactEmail: s.contactEmail || '',
@@ -57,11 +52,7 @@ export default function Settings({ data, refresh, toast }) {
         announcement: form.announcement,
         supportNote: form.supportNote,
         minSupport: Math.round(Number(form.minSupport) * 100),
-        supportMode: form.supportMode,
-        suggestedAmounts: parseSuggestedAmounts(
-          form.suggestedAmounts,
-          Math.round(Number(form.minSupport) * 100)
-        ),
+        allowCustomSupport: form.allowCustomSupport,
         goalAmount: Math.round(Number(form.goalAmount) * 100),
         showRaised: form.showRaised,
         contactEmail: form.contactEmail,
@@ -137,8 +128,8 @@ export default function Settings({ data, refresh, toast }) {
           <div className="alert alert--info" style={{ marginTop: 6 }}>
             <Icon name="image" size={16} />
             <span>
-              Hero and portrait photos are uploaded in the <strong>Website</strong> tab, where you can see exactly how
-              they’ll look before saving.
+              The logo, hero, portrait and every release, video or product image can be replaced at any time in the{' '}
+              <strong>Media</strong> tab. Hero framing and homepage words stay in <strong>Website</strong>.
             </span>
           </div>
         </div>
@@ -217,53 +208,30 @@ export default function Settings({ data, refresh, toast }) {
               onChange={(e) => setForm({ ...form, minSupport: e.target.value })}
             />
             <div className="field__hint">
-              One amount for general support, songs and videos. Streaming-platform royalties and merch prices are
-              separate.
+              {form.allowCustomSupport
+                ? 'One minimum for general support, songs and videos. Fans can give more. Streaming-platform royalties and merch prices are separate.'
+                : `One exact price for general support, songs and videos. Checkout will reject any other amount. Streaming-platform royalties and merch prices are separate.`}
             </div>
           </div>
-
-          <div className="field">
-            <label>Who decides how much fans pay?</label>
-            <div className="price-modes" role="radiogroup" aria-label="Support pricing mode">
-              <button
-                type="button"
-                role="radio"
-                aria-checked={form.supportMode === 'open'}
-                className={`price-mode ${form.supportMode === 'open' ? 'is-active' : ''}`}
-                onClick={() => setForm({ ...form, supportMode: 'open' })}
-              >
-                <strong>Fans choose</strong>
-                <small>{cedisFloor(form.minSupport)} is the minimum — fans can give more.</small>
-              </button>
-              <button
-                type="button"
-                role="radio"
-                aria-checked={form.supportMode === 'fixed'}
-                className={`price-mode ${form.supportMode === 'fixed' ? 'is-active' : ''}`}
-                onClick={() => setForm({ ...form, supportMode: 'fixed' })}
-              >
-                <strong>One set price</strong>
-                <small>Everyone pays exactly {cedisFloor(form.minSupport)}. No amount picker.</small>
-              </button>
+          <div className="toggle-row">
+            <div>
+              <strong>Let fans give more</strong>
+              <small>Turn off to make the amount above a fixed price for every support payment.</small>
             </div>
-          </div>
-
-          <div className="field">
-            <label htmlFor="s-suggested">Quick amounts (GH₵)</label>
-            <input
-              id="s-suggested"
-              value={form.suggestedAmounts}
-              onChange={(e) => setForm({ ...form, suggestedAmounts: e.target.value })}
-              disabled={form.supportMode === 'fixed'}
-              placeholder="e.g. 20, 50, 100, 250"
-              autoComplete="off"
+            <button
+              type="button"
+              className={`switch ${form.allowCustomSupport ? 'is-on' : ''}`}
+              onClick={() => setForm({ ...form, allowCustomSupport: !form.allowCustomSupport })}
+              aria-label="Toggle flexible support amounts"
+              aria-pressed={form.allowCustomSupport}
             />
-            <div className="field__hint">
-              Comma-separated amounts shown on the support panel and checkout. Leave blank for automatic
-              suggestions. Amounts below the minimum are ignored.
-            </div>
           </div>
-
+          {!form.allowCustomSupport ? (
+            <div className="alert alert--info" style={{ marginTop: 14 }}>
+              <Icon name="lock" size={16} />
+              <span>Fixed-price mode is an artist decision enforced by the server, not only a visual change.</span>
+            </div>
+          ) : null}
           <div className="field">
             <label htmlFor="s-note">Support note</label>
             <textarea

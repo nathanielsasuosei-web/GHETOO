@@ -29,7 +29,9 @@ test('the appearance tab renders the owner colour controls and live preview', as
       assert.ok(html.toLowerCase().includes(value), `${value} shown`);
     }
     assert.match(html, /type="color"/);
-    assert.match(html, /Save colours/);
+    assert.match(html, /Save appearance/);
+    assert.match(html, /Liquid Glass/);
+    assert.match(html, /Midnight Classic/);
     assert.match(html, /Body text/);
     assert.match(html, /title="Accent #4fb3ff"/);
     // The preview scopes the palette so it keeps working even before saving.

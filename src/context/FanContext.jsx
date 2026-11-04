@@ -6,96 +6,106 @@ const FanContext = createContext(null);
 export function FanProvider({ children }) {
   const [fan, setFan] = useState(null);
   const [orders, setOrders] = useState([]);
+  const [merchOrders, setMerchOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [authOpen, setAuthOpen] = useState(false);
-  const [authMode, setAuthMode] = useState('signup');
-
-  const loadOrders = useCallback(async () => {
-    try {
-      const data = await api.fanOrders();
-      setOrders(Array.isArray(data?.orders) ? data.orders : []);
-    } catch {
-      setOrders([]);
-    }
-  }, []);
+  const [authMode, setAuthMode] = useState('register');
 
   const refresh = useCallback(async () => {
     try {
       const data = await api.fanMe();
-      setFan(data?.fan || null);
-      if (data?.fan) await loadOrders();
-      else setOrders([]);
+      setFan(data.fan || null);
+      setOrders(Array.isArray(data.orders) ? data.orders : []);
+      setMerchOrders(Array.isArray(data.merchOrders) ? data.merchOrders : []);
     } catch {
       setFan(null);
       setOrders([]);
+      setMerchOrders([]);
     } finally {
       setLoading(false);
     }
-  }, [loadOrders]);
+  }, []);
 
   useEffect(() => {
     refresh();
   }, [refresh]);
 
-  const openAuth = useCallback((mode = 'signin') => {
-    setAuthMode(mode === 'signup' ? 'signup' : 'signin');
+  const openAuth = useCallback((mode = 'register') => {
+    setAuthMode(mode === 'login' ? 'login' : 'register');
     setAuthOpen(true);
   }, []);
 
   const closeAuth = useCallback(() => setAuthOpen(false), []);
 
-  const signUp = useCallback(
+  const register = useCallback(
     async (payload) => {
-      const data = await api.registerFan(payload);
-      setFan(data.fan);
+      const data = await api.fanRegister(payload);
       setAuthOpen(false);
-      await loadOrders();
+      await refresh();
       return data.fan;
     },
-    [loadOrders]
+    [refresh]
   );
 
-  const signIn = useCallback(
+  const login = useCallback(
     async (payload) => {
-      const data = await api.loginFan(payload);
-      setFan(data.fan);
+      const data = await api.fanLogin(payload);
       setAuthOpen(false);
-      await loadOrders();
+      await refresh();
       return data.fan;
     },
-    [loadOrders]
+    [refresh]
   );
 
-  const signOut = useCallback(async () => {
-    await api.logoutFan();
+  const logout = useCallback(async () => {
+    await api.fanLogout();
     setFan(null);
     setOrders([]);
+    setMerchOrders([]);
+    setAuthOpen(false);
   }, []);
 
-  const updateProfile = useCallback(async (payload) => {
-    const data = await api.updateFan(payload);
-    setFan(data.fan);
-    return data.fan;
-  }, []);
+  const saveProfile = useCallback(
+    async (payload) => {
+      const data = await api.fanUpdate(payload);
+      await refresh();
+      return data.fan;
+    },
+    [refresh]
+  );
 
   const value = useMemo(
     () => ({
       fan,
       orders,
+      merchOrders,
       loading,
       authOpen,
       authMode,
-      setAuthMode,
       openAuth,
       closeAuth,
-      signUp,
-      signIn,
-      signOut,
-      updateProfile,
+      setAuthMode,
+      register,
+      login,
+      logout,
+      saveProfile,
       refresh,
-      refreshOrders: loadOrders,
     }),
-    [fan, orders, loading, authOpen, authMode, openAuth, closeAuth, signUp, signIn, signOut, updateProfile, refresh, loadOrders]
+    [
+      fan,
+      orders,
+      merchOrders,
+      loading,
+      authOpen,
+      authMode,
+      openAuth,
+      closeAuth,
+      register,
+      login,
+      logout,
+      saveProfile,
+      refresh,
+    ]
   );
 
   return <FanContext.Provider value={value}>{children}</FanContext.Provider>;

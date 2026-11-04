@@ -2,7 +2,7 @@ import Icon from './Icon';
 import { useSite } from '../context/SiteContext';
 import { useSupport } from '../context/SupportContext';
 import { cedis } from '../lib/format';
-import { pricingFor } from '../lib/pricing';
+import { allowsCustomSupport, supportChoices, supportMinimum } from '../lib/support';
 
 export default function SupportPanel({ variant = 'home' }) {
   const { site } = useSite();
@@ -11,9 +11,9 @@ export default function SupportPanel({ variant = 'home' }) {
   const stats = site.stats;
   const goal = Number(settings.goalAmount) || 0;
   const pct = goal > 0 ? Math.min(100, Math.round((stats.raised / goal) * 100)) : 0;
-  const pricing = pricingFor(site);
-  const minimum = pricing.floor;
-  const presets = pricing.amounts;
+  const minimum = supportMinimum(site.minSupport);
+  const allowCustom = allowsCustomSupport(site.allowCustomSupport);
+  const presets = allowCustom ? supportChoices(minimum, true) : [];
 
   return (
     <div className="support-panel reveal">
@@ -27,9 +27,9 @@ export default function SupportPanel({ variant = 'home' }) {
           </h2>
           <p className="support-panel__text">
             There is no label behind this. Your support helps pay for studio hours, mixing and videos.{' '}
-            {pricing.fixed
-              ? `The artist has set one price: ${cedis(minimum)}.`
-              : `Give from ${cedis(minimum)} and choose to give more if you can.`}
+            {allowCustom
+              ? `Give from ${cedis(minimum)} and choose to give more if you can.`
+              : `The artist has set one support price: ${cedis(minimum)}.`}
           </p>
           <div className="support-panel__note">
             <Icon name="wallet" size={16} />
@@ -54,16 +54,18 @@ export default function SupportPanel({ variant = 'home' }) {
             </div>
           ) : null}
 
-          <div className="amounts" style={{ marginBottom: 12, gridTemplateColumns: `repeat(${Math.min(presets.length, 6)}, 1fr)` }}>
-            {presets.map((value) => (
-              <button key={value} onClick={() => openSupport(null, { amount: value })}>
-                {cedis(value, { withSymbol: false })}
-              </button>
-            ))}
-          </div>
-          <button className="btn btn--gold btn--block btn--lg" onClick={() => openSupport()}>
+          {allowCustom ? (
+            <div className="amounts" style={{ marginBottom: 12 }}>
+              {presets.map((value) => (
+                <button key={value} onClick={() => openSupport(null, { amount: value })}>
+                  {cedis(value, { withSymbol: false })}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          <button className="btn btn--gold btn--block btn--lg" onClick={() => openSupport(null, { amount: minimum })}>
             <Icon name="heart" size={17} />
-            {pricing.fixed ? `Support for ${cedis(minimum)}` : `Support from ${cedis(minimum)}`}
+            {allowCustom ? 'Support from' : 'Support for'} {cedis(minimum)}
           </button>
           <div
             style={{
@@ -72,7 +74,7 @@ export default function SupportPanel({ variant = 'home' }) {
               marginTop: 16,
               paddingTop: 14,
               borderTop: '1px solid var(--line)',
-              fontSize: 11,
+              fontSize: 'calc(11px * var(--ys-font-scale))',
               color: 'var(--muted)',
             }}
           >

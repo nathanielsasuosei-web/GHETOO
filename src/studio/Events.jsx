@@ -217,7 +217,7 @@ export default function Events({ data, refresh, toast }) {
                     <td className="muted">{longDate(event.date)}</td>
                     <td>
                       {event.ticketUrl ? (
-                        <a href={event.ticketUrl} target="_blank" rel="noreferrer" className="link-arrow" style={{ fontSize: 11 }}>
+                        <a href={event.ticketUrl} target="_blank" rel="noreferrer" className="link-arrow" style={{ fontSize: 'calc(11px * var(--ys-font-scale))' }}>
                           Link <Icon name="external" size={11} />
                         </a>
                       ) : (
