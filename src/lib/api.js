@@ -66,6 +66,10 @@ export const api = {
   message: (payload) => post('/api/messages', payload),
   subscribe: (email) => post('/api/subscribe', { email }),
 
+  listComments: (limit) => get(`/api/comments${limit ? `?limit=${limit}` : ''}`),
+  createComment: (comment) => post('/api/comments', { comment }),
+  deleteComment: (id) => del(`/api/admin/comments/${encodeURIComponent(id)}`),
+
   createMerchOrder: (payload) => post('/api/merch-orders', payload),
 
   // events

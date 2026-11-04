@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Icon from '../components/Icon';
 import SupportPanel from '../components/SupportPanel';
 import Wall from '../components/Wall';
+import CommentsSection from '../components/CommentsSection';
 import useReveal from '../hooks/useReveal';
 import { useSite } from '../context/SiteContext';
 import { api } from '../lib/api';
@@ -154,6 +155,8 @@ export default function Support() {
           <Wall items={site.wall} />
         </div>
       </section>
+
+      <CommentsSection />
 
       <section className="section section--tight section--line">
         <div className="container">
