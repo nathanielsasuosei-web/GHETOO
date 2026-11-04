@@ -4,19 +4,9 @@ import path from 'node:path';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { MUSIC_PLATFORMS, normalizeStreamingUrl, safeStreamingUrl, videoYouTubeUrl } from '../src/lib/streaming.js';
-import { MIN_SUPPORT_PESEWAS, MAX_SUPPORT_PESEWAS, isValidSupportMinimum, supportMinimum, supportPresets } from '../src/lib/support.js';
+import { MIN_SUPPORT_PESEWAS, MAX_SUPPORT_PESEWAS, isValidSupportMinimum, supportMinimum } from '../src/lib/support.js';
 import { sanitizeTheme } from '../src/lib/theme.js';
-import {
-  hashPassword,
-  verifyPassword,
-  publicFan,
-  createFanSession,
-  readFanSession,
-  clearFanCookie,
-  setFanCookie,
-  requireFan,
-  currentFan,
-} from './fans.js';
+import { isValidFontScale } from '../src/lib/typography.js';
 import { getState, save, saveNow, UPLOAD_DIR, DATA_DIR, id, reference } from './db.js';
 import {
   createSession,
@@ -28,6 +18,16 @@ import {
   throttleLogin,
   resetLoginThrottle,
 } from './auth.js';
+import {
+  createFanSession,
+  clearFanCookie,
+  FAN_DUMMY_PASSWORD_HASH,
+  hashFanPassword,
+  publicFan,
+  readFanSession,
+  setFanCookie,
+  verifyFanPassword,
+} from './fanAuth.js';
 import { sendMedia, extFor, safeJoin } from './media.js';
 import {
   paymentMode,
@@ -88,46 +88,15 @@ app.use((req, res, next) => {
 // ---------------------------------------------------------------- helpers
 const PESEWA_MIN = MIN_SUPPORT_PESEWAS; // GHS 1.00
 const PESEWA_MAX = MAX_SUPPORT_PESEWAS; // GHS 50,000
+const VISUAL_STYLES = ['liquid', 'classic'];
+const IMAGE_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 const emailOk = (v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v);
-const emailValid = (v) => typeof v === 'string' && v.length <= 160 && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v);
+const strictEmailOk = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v);
 const clampText = (v, max) => String(v ?? '').trim().slice(0, max);
 const toPesewas = (v) => {
   const n = Math.round(Number(v));
   return Number.isFinite(n) ? n : NaN;
 };
-const boolSetting = (v) => v === true || v === 'true' || v === 1 || v === '1';
-const SUPPORT_MODES = ['open', 'fixed'];
-const GLASS_INTENSITIES = ['subtle', 'balanced', 'bold'];
-const MAX_SUGGESTED = 6;
-
-/** Only local, bundled or uploaded assets may be used as an image URL. */
-function safeAssetPath(value) {
-  if (typeof value !== 'string') return null;
-  const v = value.trim();
-  if (!v) return '';
-  if (v === '/favicon.svg') return v;
-  if (/^\/(media|uploads)\/[A-Za-z0-9._\-/]+$/.test(v) && !v.includes('..')) return v;
-  return null;
-}
-
-/** Artist-curated quick amounts, always legal for the current minimum. */
-function normalizeSuggestedAmounts(input, floor) {
-  if (!Array.isArray(input)) return [];
-  const out = [];
-  for (const value of input) {
-    const n = Number(value);
-    if (!Number.isSafeInteger(n) || n < floor || n > PESEWA_MAX) continue;
-    if (!out.includes(n)) out.push(n);
-    if (out.length >= MAX_SUGGESTED) break;
-  }
-  return out.sort((a, b) => a - b);
-}
-
-function publicSupportAmounts(settings, floor) {
-  if (settings.supportMode === 'fixed') return [floor];
-  const custom = normalizeSuggestedAmounts(settings.suggestedAmounts, floor);
-  return custom.length ? custom : supportPresets(floor);
-}
 
 // Light in-memory throttle so the public forms can't be used as a spam cannon.
 const rateBuckets = new Map();
@@ -191,6 +160,7 @@ function publicTrack(t) {
     duration: t.duration,
     // Keep the old response field for clients, but use the artist's global minimum.
     minAmount: supportMinimum(getState().settings.minSupport),
+    fixedPrice: getState().settings.allowCustomSupport === false,
     plays: t.plays,
     downloads: t.downloads,
     featured: Boolean(t.featured),
@@ -259,6 +229,7 @@ function publicVideo(v) {
     duration: v.duration,
     views: v.views,
     featured: Boolean(v.featured),
+    fixedPrice: getState().settings.allowCustomSupport === false,
     createdAt: v.createdAt,
     youtubeUrl: videoYouTubeUrl(v),
     src: v.source === 'url' ? v.src : `/api/video/${v.id}`,
@@ -327,6 +298,15 @@ function getTrack(state, key) {
   return state.tracks.find((t) => t.id === key || t.slug === key);
 }
 
+/** Signed-in fan for this request, with session-version invalidation. */
+function currentFan(req) {
+  const session = readFanSession(req);
+  if (!session) return null;
+  const fan = getState().fans.find((entry) => entry.id === session.sub);
+  if (!fan || (fan.sessionVersion || 0) !== (session.ver || 0)) return null;
+  return fan;
+}
+
 function markPaid(order, extra = {}) {
   order.status = 'paid';
   order.confirmedAt = new Date().toISOString();
@@ -379,28 +359,9 @@ const upload = multer({
     };
     const allowed = groups[file.fieldname] || [];
     if (allowed.some((prefix) => file.mimetype.startsWith(prefix))) return cb(null, true);
-    const err = new Error(`Unsupported file type for ${file.fieldname}: ${file.mimetype}`);
-    err.status = 400;
-    cb(err);
+    cb(new Error(`Unsupported file type for ${file.fieldname}: ${file.mimetype}`));
   },
 });
-
-const ALLOWED_IMAGE_MIMES = new Set([
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-  'image/gif',
-  'image/avif',
-]);
-
-function imageFileFilter(req, file, cb) {
-  // SVG is deliberately excluded: an uploaded SVG can carry scripts when used
-  // as a favicon or opened directly in a browser tab.
-  if (ALLOWED_IMAGE_MIMES.has(file.mimetype)) return cb(null, true);
-  const err = new Error('Please choose a JPG, PNG, WebP, GIF or AVIF image.');
-  err.status = 400;
-  cb(err);
-}
 
 const siteUpload = multer({
   storage: multer.diskStorage({
@@ -408,37 +369,47 @@ const siteUpload = multer({
       cb(null, path.join(UPLOAD_DIR, 'site'));
     },
     filename(req, file, cb) {
-      const wanted = String(req.body?.target || 'hero');
-      const target = SITE_IMAGE_TARGETS[wanted] ? wanted : 'hero';
+      const requested = String(req.body?.target || 'hero');
+      const target = ['hero', 'portrait', 'logo'].includes(requested) ? requested : 'hero';
       cb(null, `${target}-${Date.now()}-${crypto.randomBytes(3).toString('hex')}${extFor(file.mimetype, file.originalname) || '.jpg'}`);
     },
   }),
   limits: { fileSize: 18 * 1024 * 1024, files: 1 },
-  fileFilter: imageFileFilter,
+  fileFilter(req, file, cb) {
+    if (IMAGE_MIME_TYPES.has(file.mimetype)) return cb(null, true);
+    cb(new Error('Please choose a JPG, PNG, WebP or GIF image.'));
+  },
 });
 
-/** One uploader for every picture on the site — see Studio → Media. */
-const IMAGE_KIND_DIRS = { site: 'site', track: 'covers', video: 'thumbs', product: 'products' };
-const mediaUpload = multer({
+const MEDIA_ASSET_KINDS = {
+  track: { collection: 'tracks', field: 'cover', dir: 'covers', prefix: 'cover' },
+  video: { collection: 'videos', field: 'thumb', dir: 'thumbs', prefix: 'thumb' },
+  product: { collection: 'products', field: 'image', dir: 'products', prefix: 'product' },
+};
+
+const assetUpload = multer({
   storage: multer.diskStorage({
     destination(req, file, cb) {
-      const dir = IMAGE_KIND_DIRS[String(req.body?.kind || '')] || 'site';
+      const dir = MEDIA_ASSET_KINDS[req.params.kind]?.dir || 'site';
       cb(null, path.join(UPLOAD_DIR, dir));
     },
     filename(req, file, cb) {
-      const kind = IMAGE_KIND_DIRS[String(req.body?.kind || '')] ? String(req.body.kind) : 'site';
-      cb(null, `${kind}-${slugify(req.body?.id || 'image')}-${Date.now()}-${crypto.randomBytes(3).toString('hex')}${extFor(file.mimetype, file.originalname) || '.jpg'}`);
+      const kind = MEDIA_ASSET_KINDS[req.params.kind]?.prefix || 'image';
+      const safeId = slugify(req.params.id).slice(0, 32);
+      cb(null, `${kind}-${safeId}-${Date.now()}-${crypto.randomBytes(3).toString('hex')}${extFor(file.mimetype, file.originalname) || '.jpg'}`);
     },
   }),
   limits: { fileSize: 18 * 1024 * 1024, files: 1 },
-  fileFilter: imageFileFilter,
+  fileFilter(req, file, cb) {
+    if (IMAGE_MIME_TYPES.has(file.mimetype)) return cb(null, true);
+    cb(new Error('Please choose a JPG, PNG, WebP or GIF image.'));
+  },
 });
 
 const SITE_IMAGE_TARGETS = {
-  hero: { field: 'heroImage', fallback: '/media/hero.jpg', label: 'Homepage hero', group: 'Site branding' },
-  portrait: { field: 'portraitImage', fallback: '/media/portrait.jpg', label: 'Portrait photo', group: 'Site branding' },
-  logo: { field: 'logoImage', fallback: '', label: 'Logo / brand mark', group: 'Site branding' },
-  favicon: { field: 'faviconImage', fallback: '/favicon.svg', label: 'Browser icon', group: 'Site branding' },
+  hero: { field: 'heroImage', fallback: '/media/hero.jpg', label: 'Homepage hero' },
+  portrait: { field: 'portraitImage', fallback: '/media/portrait.jpg', label: 'Portrait photo' },
+  logo: { field: 'logoImage', fallback: '/media/logo.svg', label: 'Logo' },
 };
 
 /** Only delete files the artist uploaded — never the artwork bundled in /media. */
@@ -460,15 +431,6 @@ function discardUploads(files) {
         // An already-removed upload needs no further cleanup.
       }
     }
-  }
-}
-
-function discardUpload(file) {
-  if (!file) return;
-  try {
-    fs.unlinkSync(file.path);
-  } catch {
-    /* already removed */
   }
 }
 
@@ -527,13 +489,104 @@ app.get('/api/site', (req, res) => {
     momoProviders: MOMO_PROVIDERS,
     minSupport: supportMinimum(state.settings.minSupport),
     maxSupport: PESEWA_MAX,
-    supportMode: SUPPORT_MODES.includes(state.settings.supportMode) ? state.settings.supportMode : 'open',
-    supportAmounts: publicSupportAmounts(state.settings, supportMinimum(state.settings.minSupport)),
-    liquidGlass: state.settings.liquidGlass !== false,
-    glassIntensity: GLASS_INTENSITIES.includes(state.settings.glassIntensity)
-      ? state.settings.glassIntensity
-      : 'balanced',
+    allowCustomSupport: state.settings.allowCustomSupport !== false,
   });
+});
+
+// ---------------------------------------------------------------- fan accounts
+app.post('/api/fans/register', async (req, res) => {
+  if (!rateLimit(`fan-register:${req.ip}`, 8, 60 * 60 * 1000)) {
+    return res.status(429).json({ error: 'Too many sign-ups from here. Please try again later.' });
+  }
+  const body = req.body || {};
+  const name = clampText(body.name, 80);
+  const email = clampText(body.email, 160).toLowerCase();
+  const password = typeof body.password === 'string' ? body.password : '';
+  if (name.length < 2) return res.status(400).json({ error: 'Add the name you want us to use.' });
+  if (!strictEmailOk(email)) return res.status(400).json({ error: 'Enter a valid email address.' });
+  if (password.length < 8 || password.length > 128) {
+    return res.status(400).json({ error: 'Use a password between 8 and 128 characters.' });
+  }
+  const state = getState();
+  if (state.fans.some((fan) => fan.email === email)) {
+    return res.status(409).json({ error: 'An account with that email already exists. Try signing in.' });
+  }
+  const now = new Date().toISOString();
+  const fan = {
+    id: id('fan_'),
+    name,
+    email,
+    phone: '',
+    passwordHash: await hashFanPassword(password),
+    sessionVersion: 0,
+    createdAt: now,
+    lastLoginAt: now,
+  };
+  state.fans.push(fan);
+  saveNow();
+  setFanCookie(res, createFanSession(fan.id, fan.sessionVersion));
+  res.status(201).json({ fan: publicFan(fan) });
+});
+
+app.post('/api/fans/login', async (req, res) => {
+  if (!rateLimit(`fan-login:${req.ip}`, 20, 15 * 60 * 1000)) {
+    return res.status(429).json({ error: 'Too many sign-in attempts. Please wait a few minutes.' });
+  }
+  const body = req.body || {};
+  const email = clampText(body.email, 160).toLowerCase();
+  const password = typeof body.password === 'string' ? body.password : '';
+  const state = getState();
+  const fan = state.fans.find((entry) => entry.email === email);
+  const candidateHash = fan?.passwordHash || FAN_DUMMY_PASSWORD_HASH;
+  const passwordOk = password.length <= 128 && await verifyFanPassword(password, candidateHash);
+  if (!fan || !passwordOk) return res.status(401).json({ error: 'Email or password is incorrect.' });
+  fan.lastLoginAt = new Date().toISOString();
+  saveNow();
+  setFanCookie(res, createFanSession(fan.id, fan.sessionVersion || 0));
+  res.json({ fan: publicFan(fan) });
+});
+
+app.post('/api/fans/logout', (req, res) => {
+  const fan = currentFan(req);
+  if (fan) {
+    // Invalidate every copy of the old stateless token, not just this browser.
+    fan.sessionVersion = (fan.sessionVersion || 0) + 1;
+    saveNow();
+  }
+  clearFanCookie(res);
+  res.json({ ok: true });
+});
+
+app.get('/api/fans/me', (req, res) => {
+  const fan = currentFan(req);
+  res.setHeader('Cache-Control', 'no-store');
+  if (!fan) return res.json({ fan: null, orders: [], merchOrders: [] });
+  const state = getState();
+  const orders = state.orders
+    .filter((order) => order.fanId === fan.id)
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .slice(0, 50)
+    .map(publicOrder);
+  const merchOrders = state.merchOrders
+    .filter((order) => order.fanId === fan.id)
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .slice(0, 50)
+    .map(publicMerchOrder);
+  res.json({ fan: publicFan(fan), orders, merchOrders });
+});
+
+app.patch('/api/fans/me', (req, res) => {
+  const fan = currentFan(req);
+  if (!fan) return res.status(401).json({ error: 'Sign in to update your account.' });
+  const body = req.body || {};
+  if (body.name !== undefined) {
+    const name = clampText(body.name, 80);
+    if (name.length < 2) return res.status(400).json({ error: 'Add the name you want us to use.' });
+    fan.name = name;
+  }
+  if (body.phone !== undefined) fan.phone = clampText(body.phone, 30);
+  saveNow();
+  res.json({ fan: publicFan(fan) });
 });
 
 app.get('/api/tracks/:key', (req, res) => {
@@ -599,17 +652,16 @@ app.post('/api/orders', async (req, res) => {
 
   const amount = Number(body.amount);
   const floor = supportMinimum(state.settings.minSupport);
+  const allowCustom = state.settings.allowCustomSupport !== false;
   if (!Number.isSafeInteger(amount) || amount < floor) {
     return res.status(400).json({ error: `Minimum support is GH₵${(floor / 100).toFixed(2)}.` });
   }
-  if (amount > PESEWA_MAX) return res.status(400).json({ error: 'That amount is too large for checkout.' });
-  // When the artist sets one price, checkout cannot be used to send any other amount.
-  if (state.settings.supportMode === 'fixed' && amount !== floor) {
-    return res.status(400).json({ error: `The artist has set one price of GH₵${(floor / 100).toFixed(2)}.` });
+  if (!allowCustom && amount !== floor) {
+    return res.status(400).json({ error: `The artist has set one support price: GH₵${(floor / 100).toFixed(2)}.` });
   }
+  if (amount > PESEWA_MAX) return res.status(400).json({ error: 'That amount is too large for checkout.' });
 
-  const fan = currentFan(req, state);
-  const supporterName = clampText(body.name, 80) || (fan ? fan.name : '');
+  const supporterName = clampText(body.name, 80);
   const email = clampText(body.email, 160).toLowerCase();
   const message = clampText(body.message, 280);
   const anonymous = Boolean(body.anonymous);
@@ -629,7 +681,7 @@ app.post('/api/orders', async (req, res) => {
   const order = {
     id: id('ord_'),
     reference: reference(),
-    fanId: fan?.id || null,
+    fanId: currentFan(req)?.id || null,
     trackId: track?.id || null,
     videoId: video?.id || null,
     videoTitle: video?.title || null,
@@ -799,146 +851,6 @@ app.post('/api/subscribe', (req, res) => {
   res.status(201).json({ ok: true, already });
 });
 
-// ---------------------------------------------------------------- fan accounts
-// Fans can create an account, sign back in, edit their details and see every
-// order placed while signed in. These are public endpoints — the fan cookie is
-// signed, httpOnly and never accepted by /api/admin.
-app.post('/api/fans/register', (req, res) => {
-  if (!rateLimit(`fanreg:${req.ip}`, 6, 10 * 60 * 1000)) {
-    return res.status(429).json({ error: 'Too many sign-ups from here. Try again in a few minutes.' });
-  }
-  const state = getState();
-  const name = clampText(req.body?.name, 80);
-  const email = clampText(req.body?.email, 160).toLowerCase();
-  const phone = clampText(req.body?.phone, 30);
-  const password = String(req.body?.password || '');
-  if (name.length < 2) return res.status(400).json({ error: 'Please add your name.' });
-  if (!emailValid(email)) return res.status(400).json({ error: 'That email doesn’t look right.' });
-  if (password.length < 8 || password.length > 128) {
-    return res.status(400).json({ error: 'Use a password with at least 8 characters.' });
-  }
-  if (state.fans.some((fan) => fan.email === email)) {
-    return res.status(409).json({ error: 'An account with that email already exists — try signing in.' });
-  }
-  const now = new Date().toISOString();
-  const fan = {
-    id: id('fan_'),
-    name,
-    email,
-    phone,
-    passwordHash: hashPassword(password),
-    sessionVersion: 0,
-    createdAt: now,
-    lastLoginAt: now,
-  };
-  state.fans.unshift(fan);
-  saveNow();
-  setFanCookie(res, createFanSession(fan));
-  res.status(201).json({ fan: publicFan(fan) });
-});
-
-app.post('/api/fans/login', (req, res) => {
-  if (!rateLimit(`fanlogin:${req.ip}`, 10, 10 * 60 * 1000)) {
-    return res.status(429).json({ error: 'Too many attempts. Try again in a few minutes.' });
-  }
-  const state = getState();
-  const email = clampText(req.body?.email, 160).toLowerCase();
-  const password = String(req.body?.password || '');
-  const fan = state.fans.find((item) => item.email === email);
-  // The same message for a missing account and a wrong password: no account fishing.
-  if (!fan || !verifyPassword(password, fan.passwordHash)) {
-    return res.status(401).json({ error: 'That email and password don’t match.' });
-  }
-  fan.lastLoginAt = new Date().toISOString();
-  saveNow();
-  setFanCookie(res, createFanSession(fan));
-  res.json({ fan: publicFan(fan) });
-});
-
-app.post('/api/fans/logout', (req, res) => {
-  const state = getState();
-  const session = readFanSession(req);
-  const fan = session ? (state.fans || []).find((item) => item.id === session.sub) : null;
-  if (fan) {
-    fan.sessionVersion = (fan.sessionVersion || 0) + 1;
-    saveNow();
-  }
-  clearFanCookie(res);
-  res.json({ ok: true });
-});
-
-app.get('/api/fans/me', (req, res) => {
-  const state = getState();
-  const fan = currentFan(req, state);
-  if (readFanSession(req) && !fan) clearFanCookie(res);
-  res.setHeader('Cache-Control', 'no-store');
-  res.json({ fan: fan ? publicFan(fan) : null });
-});
-
-app.patch('/api/fans/me', requireFan, (req, res) => {
-  const state = getState();
-  const fan = currentFan(req, state);
-  if (!fan) {
-    clearFanCookie(res);
-    return res.status(401).json({ error: 'That account is no longer available. Please sign in again.' });
-  }
-  const body = req.body || {};
-  if (body.name !== undefined) {
-    const name = clampText(body.name, 80);
-    if (name.length < 2) return res.status(400).json({ error: 'Please add your name.' });
-    fan.name = name;
-  }
-  if (body.phone !== undefined) fan.phone = clampText(body.phone, 30);
-  if (body.email !== undefined) {
-    const email = clampText(body.email, 160).toLowerCase();
-    if (!emailValid(email)) return res.status(400).json({ error: 'That email doesn’t look right.' });
-    if (state.fans.some((item) => item.id !== fan.id && item.email === email)) {
-      return res.status(409).json({ error: 'Another account already uses that email.' });
-    }
-    fan.email = email;
-  }
-  saveNow();
-  res.json({ fan: publicFan(fan) });
-});
-
-app.post('/api/fans/password', requireFan, (req, res) => {
-  const state = getState();
-  const fan = currentFan(req, state);
-  if (!fan) {
-    clearFanCookie(res);
-    return res.status(401).json({ error: 'That account is no longer available. Please sign in again.' });
-  }
-  const current = String(req.body?.currentPassword || '');
-  const next = String(req.body?.password || '');
-  if (!verifyPassword(current, fan.passwordHash)) {
-    return res.status(400).json({ error: 'Your current password is not right.' });
-  }
-  if (next.length < 8 || next.length > 128) {
-    return res.status(400).json({ error: 'Use a new password with at least 8 characters.' });
-  }
-  fan.passwordHash = hashPassword(next);
-  fan.sessionVersion = (fan.sessionVersion || 0) + 1;
-  setFanCookie(res, createFanSession(fan));
-  saveNow();
-  res.json({ ok: true });
-});
-
-app.get('/api/fans/orders', requireFan, (req, res) => {
-  const state = getState();
-  const fan = currentFan(req, state);
-  if (!fan) return res.status(401).json({ error: 'Sign in to your fan account first.' });
-  const support = state.orders
-    .filter((order) => order.fanId === fan.id)
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-    .map((order) => ({ ...publicOrder(order), kind: 'support' }));
-  const merch = state.merchOrders
-    .filter((order) => order.fanId === fan.id)
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-    .map((order) => ({ ...publicMerchOrder(order), kind: 'merch' }));
-  res.setHeader('Cache-Control', 'no-store');
-  res.json({ orders: [...support, ...merch].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)) });
-});
-
 // ---- merch checkout
 app.post('/api/merch-orders', async (req, res) => {
   if (!rateLimit(`morder:${req.ip}`, 15, 10 * 60 * 1000)) {
@@ -984,8 +896,8 @@ app.post('/api/merch-orders', async (req, res) => {
   const order = {
     id: id('mord_'),
     reference: reference(),
+    fanId: currentFan(req)?.id || null,
     kind: 'merch',
-    fanId: currentFan(req, state)?.id || null,
     items,
     amount,
     currency: 'GHS',
@@ -1130,8 +1042,6 @@ app.get('/api/admin/overview', (req, res) => {
     subscribers: state.subscribers.length,
     events: state.events.length,
     products: state.products.length,
-    fans: (state.fans || []).length,
-    fanAccounts: (state.fans || []).length,
   };
   res.setHeader('Cache-Control', 'no-store');
   res.json({
@@ -1144,8 +1054,8 @@ app.get('/api/admin/overview', (req, res) => {
     products: state.products,
     merchOrders: state.merchOrders.slice().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
     subscribers: state.subscribers,
-    fans: (state.fans || []).map(publicFan),
     merchStats,
+    fanCount: state.fans.length,
     stats,
     series,
     byMethod,
@@ -1162,16 +1072,14 @@ app.patch('/api/admin/settings', (req, res) => {
       error: `Set a minimum between GH₵${(PESEWA_MIN / 100).toFixed(2)} and GH₵${(PESEWA_MAX / 100).toFixed(2)}.`,
     });
   }
-  if (body.supportMode !== undefined && !SUPPORT_MODES.includes(body.supportMode)) {
-    return res.status(400).json({ error: 'Choose “fans choose” or “one set price”.' });
+  if (body.allowCustomSupport !== undefined && typeof body.allowCustomSupport !== 'boolean') {
+    return res.status(400).json({ error: 'The flexible-support setting must be true or false.' });
   }
-  if (body.glassIntensity !== undefined && !GLASS_INTENSITIES.includes(body.glassIntensity)) {
-    return res.status(400).json({ error: 'Choose a liquid glass intensity.' });
+  if (body.visualStyle !== undefined && !VISUAL_STYLES.includes(body.visualStyle)) {
+    return res.status(400).json({ error: 'Choose either liquid or classic appearance.' });
   }
-  for (const key of ['heroImage', 'portraitImage', 'logoImage', 'faviconImage']) {
-    if (body[key] !== undefined && safeAssetPath(body[key]) === null) {
-      return res.status(400).json({ error: `${key} must be a bundled /media or uploaded /uploads image.` });
-    }
+  if (body.fontScale !== undefined && !isValidFontScale(body.fontScale)) {
+    return res.status(400).json({ error: 'Choose a font size from 90% to 125%.' });
   }
   const allowed = [
     'artistName',
@@ -1183,35 +1091,25 @@ app.patch('/api/admin/settings', (req, res) => {
     'heroImage',
     'portraitImage',
     'logoImage',
-    'faviconImage',
     'heroFocus',
     'supportNote',
     'minSupport',
-    'supportMode',
+    'allowCustomSupport',
+    'visualStyle',
+    'fontScale',
     'announcement',
     'cardEnabled',
     'goalAmount',
     'showRaised',
     'contactEmail',
-    'liquidGlass',
-    'glassIntensity',
   ];
   for (const key of allowed) {
-    if (key === 'liquidGlass') {
-      if (body[key] !== undefined) state.settings.liquidGlass = boolSetting(body[key]);
-    } else if (body[key] !== undefined) {
-      state.settings[key] = body[key];
-    }
+    if (body[key] !== undefined) state.settings[key] = body[key];
   }
-  if (body.suggestedAmounts !== undefined) {
-    const floor = supportMinimum(body.minSupport ?? state.settings.minSupport);
-    state.settings.suggestedAmounts = normalizeSuggestedAmounts(body.suggestedAmounts, floor);
-  }
-  // Raising the minimum can never leave an illegal quick amount behind.
-  state.settings.suggestedAmounts = normalizeSuggestedAmounts(
-    state.settings.suggestedAmounts,
-    supportMinimum(state.settings.minSupport)
-  );
+  const now = new Date().toISOString();
+  if (body.visualStyle !== undefined || body.fontScale !== undefined) state.settings.styleUpdatedAt = now;
+  if (body.fontScale !== undefined) state.settings.fontScaleUpdatedAt = now;
+  if (Object.keys(body).length) state.settings.siteUpdatedAt = now;
   if (body.theme !== undefined) {
     try {
       state.settings.theme = { ...(state.settings.theme || {}), ...sanitizeTheme(body.theme) };
@@ -1238,7 +1136,8 @@ app.post('/api/admin/site-images', siteUpload.single('image'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No image uploaded.' });
   removeUploadedSiteImage(state.settings[meta.field]);
   state.settings[meta.field] = uploadedUrl(req.file);
-  state.settings.heroUpdatedAt = new Date().toISOString();
+  state.settings.siteImagesUpdatedAt = new Date().toISOString();
+  if (target === 'hero') state.settings.heroUpdatedAt = state.settings.siteImagesUpdatedAt;
   saveNow();
   res.json({ settings: state.settings, target, url: state.settings[meta.field] });
 });
@@ -1249,151 +1148,28 @@ app.delete('/api/admin/site-images/:target', (req, res) => {
   if (!meta) return res.status(400).json({ error: 'Unknown image.' });
   removeUploadedSiteImage(state.settings[meta.field]);
   state.settings[meta.field] = meta.fallback;
-  state.settings.heroUpdatedAt = new Date().toISOString();
+  state.settings.siteImagesUpdatedAt = new Date().toISOString();
   saveNow();
   res.json({ settings: state.settings, target: req.params.target, url: meta.fallback });
 });
 
-// ---- media library: replace ANY picture on the site from one place
-const CONTENT_IMAGE_KINDS = {
-  track: { collection: 'tracks', field: 'cover', fallback: '/media/covers/placeholder.jpg' },
-  video: { collection: 'videos', field: 'thumb', fallback: '/media/thumbs/placeholder.jpg' },
-  product: { collection: 'products', field: 'image', fallback: '/media/covers/placeholder.jpg' },
-};
-
-function imageSlots(state) {
-  const slot = (key, kind, id, label, group, url, fallback) => ({
-    key,
-    kind,
-    id,
-    label,
-    group,
-    url: url || fallback,
-    fallback,
-    custom: typeof url === 'string' && url.startsWith('/uploads/'),
-  });
-  const out = Object.entries(SITE_IMAGE_TARGETS).map(([target, meta]) =>
-    slot(`site:${target}`, 'site', target, meta.label, meta.group, state.settings[meta.field], meta.fallback)
-  );
-  for (const [kind, config] of Object.entries(CONTENT_IMAGE_KINDS)) {
-    const group = {
-      track: 'Release covers',
-      video: 'Video thumbnails',
-      product: 'Merch photos',
-    }[kind];
-    for (const item of state[config.collection] || []) {
-      out.push(
-        slot(
-          `${kind}:${item.id}`,
-          kind,
-          item.id,
-          `${item.title} — ${kind === 'track' ? 'cover' : kind === 'video' ? 'thumbnail' : 'photo'}`,
-          group,
-          item[config.field],
-          config.fallback
-        )
-      );
-    }
-  }
-  return out;
-}
-
-app.get('/api/admin/media', (req, res) => {
-  res.setHeader('Cache-Control', 'no-store');
-  res.json({ slots: imageSlots(getState()) });
-});
-
-app.post('/api/admin/media/replace', mediaUpload.single('image'), (req, res) => {
+// Replace any catalogue picture from Studio → Media. Bundled /media artwork is
+// preserved; only a previous /uploads replacement is deleted.
+app.post('/api/admin/media/:kind/:id', assetUpload.single('image'), (req, res) => {
+  const meta = MEDIA_ASSET_KINDS[req.params.kind];
   const state = getState();
-  const kind = String(req.body?.kind || '');
-  const key = String(req.body?.id || '');
-  if (!req.file) return res.status(400).json({ error: 'No image uploaded.' });
-  if (!IMAGE_KIND_DIRS[kind]) {
-    discardUpload(req.file);
-    return res.status(400).json({ error: 'Unknown image kind.' });
+  const item = meta ? state[meta.collection].find((entry) => entry.id === req.params.id) : null;
+  if (!meta || !item || !req.file) {
+    if (req.file) discardUploads({ image: [req.file] });
+    return res.status(!meta ? 400 : item ? 400 : 404).json({
+      error: !meta ? 'Unknown image type.' : item ? 'No image uploaded.' : 'That item no longer exists.',
+    });
   }
-
-  let oldUrl = null;
-  const url = uploadedUrl(req.file);
-  if (kind === 'site') {
-    const meta = SITE_IMAGE_TARGETS[key];
-    if (!meta) {
-      discardUpload(req.file);
-      return res.status(400).json({ error: 'Unknown site image.' });
-    }
-    oldUrl = state.settings[meta.field];
-    state.settings[meta.field] = url;
-    state.settings.heroUpdatedAt = new Date().toISOString();
-  } else {
-    const config = CONTENT_IMAGE_KINDS[kind];
-    const item = state[config.collection].find((entry) => entry.id === key);
-    if (!item) {
-      discardUpload(req.file);
-      return res.status(404).json({ error: 'That item no longer exists.' });
-    }
-    oldUrl = item[config.field];
-    item[config.field] = url;
-  }
-  if (typeof oldUrl === 'string' && oldUrl.startsWith('/uploads/')) removeMedia(oldUrl);
+  const previous = item[meta.field];
+  if (typeof previous === 'string' && previous.startsWith(`/uploads/${meta.dir}/`)) removeMedia(previous);
+  item[meta.field] = uploadedUrl(req.file);
   saveNow();
-  res.json({ ok: true, url, slots: imageSlots(state) });
-});
-
-app.delete('/api/admin/media/:kind/:id', (req, res) => {
-  const state = getState();
-  const kind = req.params.kind;
-  const key = req.params.id;
-  let oldUrl;
-  let fallback;
-  if (kind === 'site') {
-    const meta = SITE_IMAGE_TARGETS[key];
-    if (!meta) return res.status(400).json({ error: 'Unknown site image.' });
-    oldUrl = state.settings[meta.field];
-    fallback = meta.fallback;
-    state.settings[meta.field] = fallback;
-  } else if (CONTENT_IMAGE_KINDS[kind]) {
-    const config = CONTENT_IMAGE_KINDS[kind];
-    const item = state[config.collection].find((entry) => entry.id === key);
-    if (!item) return res.status(404).json({ error: 'That item no longer exists.' });
-    oldUrl = item[config.field];
-    fallback = config.fallback;
-    item[config.field] = fallback;
-  } else {
-    return res.status(400).json({ error: 'Unknown image kind.' });
-  }
-  if (typeof oldUrl === 'string' && oldUrl.startsWith('/uploads/')) removeMedia(oldUrl);
-  saveNow();
-  res.json({ ok: true, url: fallback, slots: imageSlots(state) });
-});
-
-// ---- fan accounts (studio view)
-app.get('/api/admin/fans', (req, res) => {
-  const state = getState();
-  const fans = (state.fans || []).map((fan) => {
-    const support = state.orders.filter((order) => order.fanId === fan.id);
-    const merch = state.merchOrders.filter((order) => order.fanId === fan.id);
-    return {
-      ...publicFan(fan),
-      orders: support.length + merch.length,
-      contributed: support
-        .filter((order) => order.status === 'paid')
-        .reduce((sum, order) => sum + order.amount, 0),
-    };
-  });
-  res.setHeader('Cache-Control', 'no-store');
-  res.json({ fans });
-});
-
-app.delete('/api/admin/fans/:id', (req, res) => {
-  const state = getState();
-  const idx = (state.fans || []).findIndex((fan) => fan.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'Fan account not found.' });
-  state.fans.splice(idx, 1);
-  // Orders stay in the ledger; just remove the link to the deleted account.
-  for (const order of state.orders) if (order.fanId === req.params.id) order.fanId = null;
-  for (const order of state.merchOrders) if (order.fanId === req.params.id) order.fanId = null;
-  saveNow();
-  res.json({ ok: true });
+  res.json({ kind: req.params.kind, id: item.id, url: item[meta.field] });
 });
 
 // ---- tracks
@@ -1807,10 +1583,29 @@ app.use('/uploads/site', express.static(path.join(UPLOAD_DIR, 'site'), { maxAge:
 app.use('/uploads/products', express.static(path.join(UPLOAD_DIR, 'products'), { maxAge: '7d', fallthrough: true }));
 
 if (fs.existsSync(DIST)) {
+  const CLIENT_ROUTES = [
+    '/',
+    '/music',
+    '/videos',
+    '/events',
+    '/merch',
+    '/support',
+    '/about',
+    '/account',
+    '/thank-you',
+    '/studio',
+  ];
+  const ASSET_PREFIXES = ['/assets/', '/media/', '/uploads/'];
   app.use(express.static(DIST, { index: false, maxAge: '1h' }));
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api/')) return next();
-    res.sendFile(path.join(DIST, 'index.html'));
+    if (ASSET_PREFIXES.some((prefix) => req.path.startsWith(prefix))) return res.sendStatus(404);
+    const pathname = req.path.replace(/\/+$/, '') || '/';
+    const known = CLIENT_ROUTES.some(
+      (route) => pathname === route || (route !== '/' && pathname.startsWith(`${route}/`))
+    );
+    res.status(known ? 200 : 404);
+    return res.sendFile(path.join(DIST, 'index.html'));
   });
 } else {
   app.get('/', (req, res) =>
@@ -1824,12 +1619,9 @@ if (fs.existsSync(DIST)) {
 app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {
     const messages = {
-      LIMIT_FILE_SIZE: 'That file is too large. Audio max 800MB, video max 800MB.',
+      LIMIT_FILE_SIZE: 'That file is too large. Images max 18MB, audio and video max 800MB.',
     };
     return res.status(400).json({ error: messages[err.code] || err.message });
-  }
-  if (err.status && err.status >= 400 && err.status < 500) {
-    return res.status(err.status).json({ error: err.message || 'Bad request.' });
   }
   if (err) {
     console.error(err);
@@ -1843,7 +1635,7 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`Young Silence · listening on http://0.0.0.0:${PORT}`);
   console.log(`Payments: ${paymentMode()} · Studio password: ${process.env.ARTIST_PASSWORD ? 'set via env' : 'youngsilence (default)'}`);
   console.log(
-    `${state.tracks.length} tracks · ${state.videos.length} videos · ${state.orders.length} support orders · ${state.events.length} events · ${state.products.length} products · ${state.subscribers.length} subscribers`
+    `${state.tracks.length} tracks · ${state.videos.length} videos · ${state.orders.length} support orders · ${state.events.length} events · ${state.products.length} products · ${state.subscribers.length} subscribers · ${state.fans.length} fan accounts`
   );
 });
 

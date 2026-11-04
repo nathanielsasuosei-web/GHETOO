@@ -18,10 +18,6 @@ export default function Music() {
         <div className="container">
           <span className="eyebrow">Discography</span>
           <h1>Music</h1>
-          <p>
-            Listen on your favourite streaming platforms or play available releases here. You can also support the
-            music directly; select releases include a download to keep.
-          </p>
         </div>
       </section>
 
@@ -45,14 +41,6 @@ export default function Music() {
           ) : (
             <div className="empty">No releases yet.</div>
           )}
-
-          <div className="alert alert--info" style={{ marginTop: 30 }}>
-            <Icon name="download" size={16} />
-            <span>
-              Support the music directly. Releases with an uploaded audio file include a download; supporters’ names
-              and messages appear on the wall unless you choose to stay anonymous.
-            </span>
-          </div>
         </div>
       </section>
     </>

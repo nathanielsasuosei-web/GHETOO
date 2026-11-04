@@ -84,16 +84,16 @@ export default function Orders({ data, refresh, toast }) {
         </div>
         <div style={{ display: 'flex', gap: 16 }}>
           <div style={{ textAlign: 'right' }}>
-            <div className="mono" style={{ fontSize: 10, letterSpacing: '0.12em', color: 'var(--muted)' }}>
+            <div className="mono" style={{ fontSize: 'calc(10px * var(--ys-font-scale))', letterSpacing: '0.12em', color: 'var(--muted)' }}>
               CONFIRMED
             </div>
-            <strong style={{ fontFamily: 'var(--serif)', fontSize: 24, color: 'var(--gold)' }}>{cedis(totals.paid)}</strong>
+            <strong style={{ fontFamily: 'var(--serif)', fontSize: 'calc(24px * var(--ys-font-scale))', color: 'var(--gold)' }}>{cedis(totals.paid)}</strong>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <div className="mono" style={{ fontSize: 10, letterSpacing: '0.12em', color: 'var(--muted)' }}>
+            <div className="mono" style={{ fontSize: 'calc(10px * var(--ys-font-scale))', letterSpacing: '0.12em', color: 'var(--muted)' }}>
               AWAITING
             </div>
-            <strong style={{ fontFamily: 'var(--serif)', fontSize: 24 }}>{cedis(totals.pending)}</strong>
+            <strong style={{ fontFamily: 'var(--serif)', fontSize: 'calc(24px * var(--ys-font-scale))' }}>{cedis(totals.pending)}</strong>
           </div>
         </div>
       </div>
@@ -129,7 +129,7 @@ export default function Orders({ data, refresh, toast }) {
               border: '1px solid var(--line-strong)',
               borderRadius: 8,
               padding: '9px 12px',
-              fontSize: 12.5,
+              fontSize: 'calc(12.5px * var(--ys-font-scale))',
               minWidth: 240,
             }}
           />
@@ -178,7 +178,7 @@ export default function Orders({ data, refresh, toast }) {
                   <td>
                     <span className={`badge-status badge-status--${o.status}`}>{o.status}</span>
                     {o.demo ? (
-                      <div className="sub" style={{ fontSize: 10 }}>
+                      <div className="sub" style={{ fontSize: 'calc(10px * var(--ys-font-scale))' }}>
                         sandbox
                       </div>
                     ) : null}

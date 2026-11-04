@@ -308,7 +308,7 @@ export default function VideoManager({ data, refresh, toast }) {
                         <strong>
                           {item.title}
                           {item.featured ? (
-                            <span className="chip" style={{ fontSize: 9, padding: '1px 7px', marginLeft: 6 }}>
+                            <span className="chip" style={{ fontSize: 'calc(9px * var(--ys-font-scale))', padding: '1px 7px', marginLeft: 6 }}>
                               Featured
                             </span>
                           ) : null}

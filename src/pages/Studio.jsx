@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import Icon from '../components/Icon';
-import BrandMark from '../components/BrandMark';
+import BrandLogo from '../components/BrandLogo';
 import { api } from '../lib/api';
 import { useToast } from '../context/ToastContext';
 import { useSite } from '../context/SiteContext';
@@ -16,7 +16,6 @@ import Newsletter from '../studio/Newsletter';
 import Settings from '../studio/Settings';
 import Website from '../studio/Website';
 import Media from '../studio/Media';
-import Fans from '../studio/Fans';
 import Appearance from '../studio/Appearance';
 
 const TABS = [
@@ -30,11 +29,11 @@ const TABS = [
   },
   {
     id: 'media', label: 'Media', icon: 'image', group: 'Workspace',
-    description: 'Replace any picture on the site', keywords: 'images hero logo favicon covers thumbnails photos uploads branding',
+    description: 'Replace the logo and every site picture', keywords: 'logo hero portrait covers thumbnails product photos images uploads branding',
   },
   {
     id: 'appearance', label: 'Appearance', icon: 'sparkle', group: 'Workspace',
-    description: 'Colours, presets and live theme preview', keywords: 'theme colours colors palette brand design accent background dark light',
+    description: 'Liquid Glass, font size, colours and live preview', keywords: 'theme colours colors palette brand design accent background dark light font size type liquid glass',
   },
   {
     id: 'releases', label: 'Music', icon: 'music', group: 'Workspace',
@@ -59,10 +58,6 @@ const TABS = [
   {
     id: 'messages', label: 'Messages', icon: 'mail', group: 'Community',
     description: 'Read and reply to fan messages', keywords: 'inbox email contact',
-  },
-  {
-    id: 'fans', label: 'Fans', icon: 'users', group: 'Community',
-    description: 'Fan accounts and their orders', keywords: 'accounts members signups users community',
   },
   {
     id: 'newsletter', label: 'Newsletter', icon: 'send', group: 'Community',
@@ -90,7 +85,7 @@ function initialsFor(name = 'Young Silence') {
     .toUpperCase() || 'YS';
 }
 
-function Login({ onDone }) {
+function Login({ onDone, settings }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -115,9 +110,9 @@ function Login({ onDone }) {
       <div className="studio-login__card v12-login__card">
         <section className="v12-login__showcase" aria-label="Studio V12">
           <Link to="/" className="v12-login__brand">
-            <BrandMark />
+            <BrandLogo settings={settings} />
             <span>
-              <strong>Young Silence</strong>
+              <strong>{settings?.artistName || 'Young Silence'}</strong>
               <small>Studio V12</small>
             </span>
           </Link>
@@ -185,7 +180,7 @@ function Login({ onDone }) {
             Default password is <code>youngsilence</code> — set <code>ARTIST_PASSWORD</code> in the environment to change it.
           </p>
           <p className="studio-login__hint" style={{ marginTop: 10 }}>
-            <Link to="/" className="link-arrow" style={{ fontSize: 11 }}>
+            <Link to="/" className="link-arrow" style={{ fontSize: 'calc(11px * var(--ys-font-scale))' }}>
               ← Back to the site
             </Link>
           </p>
@@ -200,7 +195,7 @@ export default function Studio() {
   const navigate = useNavigate();
   const tab = location.pathname.split('/')[2];
   const { toast } = useToast();
-  const { reload: reloadSite } = useSite();
+  const { site, reload: reloadSite } = useSite();
   const [authed, setAuthed] = useState(null);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -341,6 +336,7 @@ export default function Studio() {
   if (!authed) {
     return (
       <Login
+        settings={site?.settings}
         onDone={() => {
           setAuthed(true);
         }}
@@ -396,7 +392,7 @@ export default function Studio() {
       >
         <div className="v12-rail__head">
           <Link to="/" className="brand v12-rail__brand">
-            <BrandMark />
+            <BrandLogo settings={data.settings} />
             <span className="brand__text v12-rail__brand-text">
               <span className="brand__name">Studio V12</span>
               <span className="brand__sub">{artistName}</span>
@@ -576,8 +572,8 @@ export default function Studio() {
         <div className="studio__mobile v12-mobile-bar">
           <div className="v12-mobile-bar__top">
             <Link to="/" className="brand">
-              <BrandMark style={{ width: 32, height: 32, fontSize: 15 }} />
-              <span className="brand__name" style={{ fontSize: 12 }}>Studio V12</span>
+              <BrandLogo settings={data.settings} className="brand__mark--sm" />
+              <span className="brand__name" style={{ fontSize: 'calc(12px * var(--ys-font-scale))' }}>Studio V12</span>
             </Link>
             <button onClick={logout} className="icon-btn icon-btn--sm" aria-label="Sign out">
               <Icon name="logout" size={15} />
@@ -623,7 +619,7 @@ export default function Studio() {
             <div className="v12-pulse__item">
               <span>Community</span>
               <strong>{subscriberCount}</strong>
-              <small>newsletter subscribers</small>
+              <small>{data.fanCount || 0} fan accounts · {subscriberCount} newsletter</small>
             </div>
           </div>
 
@@ -637,7 +633,6 @@ export default function Studio() {
           {active === 'merch' ? <Merch {...common} /> : null}
           {active === 'supporters' ? <Orders {...common} /> : null}
           {active === 'messages' ? <Messages {...common} /> : null}
-          {active === 'fans' ? <Fans {...common} /> : null}
           {active === 'newsletter' ? <Newsletter {...common} /> : null}
           {active === 'settings' ? <Settings {...common} /> : null}
         </div>

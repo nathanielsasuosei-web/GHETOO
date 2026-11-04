@@ -23,6 +23,7 @@ export default function Home() {
   const featured = tracks.find((t) => t.featured) || tracks[0];
   const latest = tracks.slice(0, 4);
   const videos = site.videos;
+  const pricePrefix = site.allowCustomSupport === false ? 'Price ' : 'from ';
   useReveal(site);
 
   return (
@@ -166,7 +167,7 @@ export default function Home() {
                     <Icon name="download" size={13} /> {compact(featured.downloads)} downloads
                   </span>
                   <span className="chip">
-                    from <strong>{cedis(featured.minAmount)}</strong>
+                    {pricePrefix}<strong>{cedis(featured.minAmount)}</strong>
                   </span>
                 </div>
                 <div className="spotlight__actions">

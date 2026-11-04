@@ -331,7 +331,7 @@ export default function Merch({ data, refresh, toast }) {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search reference, name, phone…"
-              style={{ background: '#0a0b0c', border: '1px solid var(--line-strong)', borderRadius: 8, padding: '9px 12px', fontSize: 12.5, minWidth: 240 }}
+              style={{ background: '#0a0b0c', border: '1px solid var(--line-strong)', borderRadius: 8, padding: '9px 12px', fontSize: 'calc(12.5px * var(--ys-font-scale))', minWidth: 240 }}
             />
           </div>
           <div className="table-wrap">
@@ -370,7 +370,7 @@ export default function Merch({ data, refresh, toast }) {
                     <td className="muted">{METHOD_LABEL[o.provider] || o.method}</td>
                     <td>
                       <span className={`badge-status badge-status--${o.status}`}>{o.status}</span>
-                      {o.demo ? <div className="sub" style={{ fontSize: 10 }}>sandbox</div> : null}
+                      {o.demo ? <div className="sub" style={{ fontSize: 'calc(10px * var(--ys-font-scale))' }}>sandbox</div> : null}
                     </td>
                     <td className="muted" title={longDate(o.createdAt)}>
                       {relativeTime(o.createdAt)}

@@ -6,8 +6,12 @@ import { useSupport } from '../context/SupportContext';
 import { useFan } from '../context/FanContext';
 import { api } from '../lib/api';
 import { cedis } from '../lib/format';
-import { MAX_SUPPORT_PESEWAS } from '../lib/support';
-import { pricingFor } from '../lib/pricing';
+import {
+  MAX_SUPPORT_PESEWAS,
+  allowsCustomSupport,
+  supportChoices,
+  supportMinimum,
+} from '../lib/support';
 
 const NETWORKS = [
   { id: 'mtn', label: 'MTN MoMo', color: '#FFCC00' },
@@ -29,7 +33,7 @@ function CopyRow({ label, value }) {
   return (
     <div className="copy-row">
       <div>
-        <div style={{ fontSize: 9.5, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--muted-2)' }}>
+        <div style={{ fontSize: 'calc(9.5px * var(--ys-font-scale))', letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--muted-2)' }}>
           {label}
         </div>
         <code>{value}</code>
@@ -44,7 +48,7 @@ function CopyRow({ label, value }) {
 export default function SupportModal() {
   const { open, track: presetTrack, video: presetVideo, amount: presetAmount, closeSupport } = useSupport();
   const { site } = useSite();
-  const { fan, openAuth, refreshOrders } = useFan();
+  const { fan, refresh: refreshFan, openAuth } = useFan();
   const tracks = site?.tracks || [];
   const videos = site?.videos || [];
   const [step, setStep] = useState('form');
@@ -71,9 +75,9 @@ export default function SupportModal() {
     () => videos.find((v) => v.id === videoId) || null,
     [videos, videoId]
   );
-  const pricing = pricingFor(site);
-  const floor = pricing.floor;
-  const fixedPrice = pricing.fixed;
+  const floor = supportMinimum(site?.minSupport);
+  const allowCustom = allowsCustomSupport(site?.allowCustomSupport);
+  const pricePhrase = allowCustom ? `from ${cedis(floor)}` : `Price ${cedis(floor)}`;
 
   useEffect(() => {
     if (!open) return;
@@ -84,19 +88,30 @@ export default function SupportModal() {
     setBusy(false);
     setTrackId(presetTrack?.id || '');
     setVideoId(presetVideo?.id || '');
-    const requested = Number.isSafeInteger(presetAmount) && !fixedPrice ? presetAmount : floor;
-    setAmountInput(String(Math.min(MAX_SUPPORT_PESEWAS, Math.max(floor, requested)) / 100));
     setName(fan?.name || '');
     setEmail(fan?.email || '');
+    const requested = allowCustom && Number.isSafeInteger(presetAmount) ? presetAmount : floor;
+    setAmountInput(String(Math.min(MAX_SUPPORT_PESEWAS, Math.max(floor, requested)) / 100));
     setMessage('');
+    const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     const onKey = (e) => e.key === 'Escape' && closeSupport();
     window.addEventListener('keydown', onKey);
     return () => {
-      document.body.style.overflow = '';
+      document.body.style.overflow = previousOverflow;
       window.removeEventListener('keydown', onKey);
     };
-  }, [open, presetTrack?.id, presetVideo?.id, presetAmount, floor, fixedPrice, fan?.name, fan?.email, closeSupport]);
+  }, [
+    open,
+    presetTrack?.id,
+    presetVideo?.id,
+    presetAmount,
+    floor,
+    allowCustom,
+    fan?.name,
+    fan?.email,
+    closeSupport,
+  ]);
 
   // poll while waiting for a manual MoMo confirmation
   useEffect(() => {
@@ -123,7 +138,7 @@ export default function SupportModal() {
 
   if (!open || !site) return null;
 
-  const presets = pricing.amounts;
+  const presets = supportChoices(floor, allowCustom);
   const numericAmount = Number(amountInput);
   const amount = amountInput.trim() && Number.isFinite(numericAmount) ? Math.round(numericAmount * 100) : NaN;
 
@@ -132,6 +147,10 @@ export default function SupportModal() {
     setError('');
     if (!Number.isSafeInteger(amount) || Math.abs(numericAmount * 100 - amount) > 0.000001 || amount < floor) {
       setError(`Enter an amount of at least ${cedis(floor)}, with up to two decimal places.`);
+      return;
+    }
+    if (!allowCustom && amount !== floor) {
+      setError(`The artist has set one support price: ${cedis(floor)}.`);
       return;
     }
     if (amount > MAX_SUPPORT_PESEWAS) {
@@ -163,10 +182,10 @@ export default function SupportModal() {
         window.location.href = result.authorizationUrl;
         return;
       }
+      if (fan) refreshFan().catch(() => {});
       setOrder(result.order || null);
       setMomo(result.momo || null);
       setStep(result.status === 'paid' ? 'paid' : 'pending');
-      if (fan) refreshOrders();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -186,9 +205,9 @@ export default function SupportModal() {
                 <span className="eyebrow">Support the artist</span>
                 <h3>{selectedVideo ? 'Support this video' : selectedTrack ? (selectedTrack.hasDownload ? 'Buy this record' : 'Support this release') : 'Fund the next release'}</h3>
                 <p>
-                  {fixedPrice
-                    ? `The artist has set one price: ${cedis(floor)}.`
-                    : `Support from ${cedis(floor)}. You can choose to give more.`}
+                  {allowCustom
+                    ? `Support from ${cedis(floor)}. You can choose to give more.`
+                    : `The artist has set one support price: ${cedis(floor)}.`}
                 </p>
               </div>
               <button type="button" className="modal__close" onClick={closeSupport} aria-label="Close">
@@ -203,7 +222,7 @@ export default function SupportModal() {
                   <div>
                     <h4>{selectedTrack?.title || selectedVideo?.title}</h4>
                     <p>
-                      {selectedTrack ? `${selectedTrack.genre} · ${selectedTrack.year}` : 'Video'} · {fixedPrice ? cedis(floor) : `from ${cedis(floor)}`}
+                      {selectedTrack ? `${selectedTrack.genre} · ${selectedTrack.year}` : 'Video'} · {pricePhrase}
                     </p>
                     {selectedVideo || !selectedTrack.hasDownload ? <p>Support only — no download is included.</p> : null}
                   </div>
@@ -243,15 +262,9 @@ export default function SupportModal() {
                 </div>
               )}
 
-              {fixedPrice ? (
-                <div className="artist-price">
-                  <span className="eyebrow eyebrow--plain">Artist-set price</span>
-                  <strong>{cedis(floor)}</strong>
-                  <p>One price for every song, video and general support. Set by the artist in the studio.</p>
-                </div>
-              ) : (
+              {allowCustom ? (
                 <>
-                  <div className="amounts" style={{ gridTemplateColumns: `repeat(${Math.min(presets.length, 6)}, 1fr)` }}>
+                  <div className="amounts">
                     {presets.map((value) => (
                       <button
                         type="button"
@@ -283,6 +296,13 @@ export default function SupportModal() {
                     </div>
                   </div>
                 </>
+              ) : (
+                <div className="fixed-price">
+                  <span>Artist-set price</span>
+                  <strong>{cedis(floor)}</strong>
+                  <small><Icon name="lock" size={13} /> This exact amount applies to every support payment.</small>
+                  <input type="hidden" name="amount" value={floor / 100} readOnly />
+                </div>
               )}
 
               <div className="methods">
@@ -329,31 +349,6 @@ export default function SupportModal() {
                 </div>
               ) : null}
 
-              <div className="fan-checkout-note">
-                {fan ? (
-                  <>
-                    <Icon name="user" size={14} />
-                    <span>Signed in as <strong>{fan.name}</strong> — this support will be saved to your account.</span>
-                    <Link to="/account" onClick={closeSupport}>My account</Link>
-                  </>
-                ) : (
-                  <>
-                    <Icon name="shield" size={14} />
-                    <span>Want your receipts and downloads in one place?</span>
-                    <button
-                      type="button"
-                      className="link-arrow"
-                      onClick={() => {
-                        closeSupport();
-                        openAuth('signup');
-                      }}
-                    >
-                      Create a free account
-                    </button>
-                  </>
-                )}
-              </div>
-
               <div className="field-row">
                 <div className="field">
                   <label htmlFor="support-name">Name on the wall</label>
@@ -377,6 +372,21 @@ export default function SupportModal() {
                     maxLength={160}
                   />
                 </div>
+              </div>
+
+              <div className="fan-prefill">
+                {fan ? (
+                  <span>
+                    <Icon name="user" size={14} /> Signed in as {fan.name} ·{' '}
+                    <Link to="/account" onClick={closeSupport}>My account</Link>
+                  </span>
+                ) : (
+                  <span>
+                    <button type="button" onClick={() => openAuth('register')}>Create a fan account</button> to save
+                    these details and keep your support history.{' '}
+                    <button type="button" onClick={() => openAuth('login')}>Sign in</button>
+                  </span>
+                )}
               </div>
 
               <label className="check">
@@ -426,7 +436,7 @@ export default function SupportModal() {
               </button>
             </div>
             <div className="modal__body pay">
-              <div className="pay__label mono" style={{ fontSize: 10, letterSpacing: '0.2em', color: 'var(--muted)' }}>
+              <div className="pay__label mono" style={{ fontSize: 'calc(10px * var(--ys-font-scale))', letterSpacing: '0.2em', color: 'var(--muted)' }}>
                 AMOUNT TO SEND
               </div>
               <div className="pay__amount">{cedis(order?.amount || amount)}</div>
@@ -501,7 +511,7 @@ export default function SupportModal() {
               <div className="success-ring">
                 <Icon name="check" size={30} strokeWidth={2} />
               </div>
-              <p style={{ color: 'var(--ivory-dim)', fontSize: 14.5, lineHeight: 1.7 }}>
+              <p style={{ color: 'var(--ivory-dim)', fontSize: 'calc(14.5px * var(--ys-font-scale))', lineHeight: 1.7 }}>
                 {cedis(order?.amount || amount)} received
                 {order?.trackTitle ? ` for “${order.trackTitle}”` : ' as general support'}. Every cedi goes into the
                 music.

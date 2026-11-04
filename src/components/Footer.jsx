@@ -1,15 +1,13 @@
 import { Link } from 'react-router-dom';
 import Icon from './Icon';
+import BrandLogo from './BrandLogo';
 import Newsletter from './Newsletter';
-import BrandMark from './BrandMark';
 import { useSite } from '../context/SiteContext';
-import { useFan } from '../context/FanContext';
 
 const socialIcons = { instagram: 'instagram', tiktok: 'tiktok', youtube: 'youtube', x: 'x', audiomack: 'music' };
 
 export default function Footer() {
   const { site } = useSite();
-  const { fan } = useFan();
   const settings = site?.settings || {};
   const socials = Object.entries(settings.socials || {}).filter(([, url]) => url);
 
@@ -23,7 +21,7 @@ export default function Footer() {
         <div className="footer__top">
           <div className="footer__brand">
             <Link to="/" className="brand">
-              <BrandMark />
+              <BrandLogo settings={settings} />
               <span className="brand__text">
                 <span className="brand__name">{settings.artistName}</span>
                 <span className="brand__sub">{settings.tagline}</span>
@@ -60,7 +58,7 @@ export default function Footer() {
             <Link to="/merch">Merch store</Link>
             <a href={`mailto:${settings.contactEmail || 'hello@youngsilence.gh'}`}>Bookings & press</a>
             <Link to="/studio">Artist studio</Link>
-            <Link to="/account">{fan ? 'My fan account' : 'Create a fan account'}</Link>
+            <Link to="/account">Fan account</Link>
           </div>
 
           <div className="footer__col">

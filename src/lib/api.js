@@ -86,19 +86,10 @@ export const api = {
 
   // fan accounts
   fanMe: () => get('/api/fans/me'),
-  registerFan: (payload) => post('/api/fans/register', payload),
-  loginFan: (payload) => post('/api/fans/login', payload),
-  logoutFan: () => post('/api/fans/logout'),
-  updateFan: (payload) => patch('/api/fans/me', payload),
-  changeFanPassword: (payload) => post('/api/fans/password', payload),
-  fanOrders: () => get('/api/fans/orders'),
-
-  // media library + fan accounts (studio)
-  mediaSlots: () => get('/api/admin/media'),
-  replaceMedia: (form, onProgress) => uploadWithProgress('/api/admin/media/replace', form, onProgress),
-  resetMedia: (kind, id) => del(`/api/admin/media/${encodeURIComponent(kind)}/${encodeURIComponent(id)}`),
-  listFans: () => get('/api/admin/fans'),
-  deleteFan: (id) => del(`/api/admin/fans/${encodeURIComponent(id)}`),
+  fanRegister: (payload) => post('/api/fans/register', payload),
+  fanLogin: (payload) => post('/api/fans/login', payload),
+  fanLogout: () => post('/api/fans/logout'),
+  fanUpdate: (payload) => patch('/api/fans/me', payload),
 
   me: () => get('/api/admin/me'),
   login: (password) => post('/api/admin/login', { password }),
@@ -107,6 +98,12 @@ export const api = {
   saveSettings: (payload) => patch('/api/admin/settings', payload),
   uploadSiteImage: (form, onProgress) => uploadWithProgress('/api/admin/site-images', form, onProgress),
   resetSiteImage: (target) => del(`/api/admin/site-images/${target}`),
+  replaceMedia: (kind, itemId, form, onProgress) =>
+    uploadWithProgress(
+      `/api/admin/media/${encodeURIComponent(kind)}/${encodeURIComponent(itemId)}`,
+      form,
+      onProgress
+    ),
 
   createTrack: (form, onProgress) => uploadWithProgress('/api/admin/tracks', form, onProgress),
   updateTrack: (id, payload) => patch(`/api/admin/tracks/${id}`, payload),

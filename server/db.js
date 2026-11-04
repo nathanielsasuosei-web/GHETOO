@@ -3,6 +3,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { seedState } from './seed.js';
 import { MIN_SUPPORT_PESEWAS, MAX_SUPPORT_PESEWAS } from '../src/lib/support.js';
+import { normalizeFontScale } from '../src/lib/typography.js';
 
 const ROOT = process.cwd();
 export const DATA_DIR = process.env.DATA_DIR || path.join(ROOT, 'data');
@@ -61,6 +62,11 @@ export function getState() {
   state.merchOrders ||= [];
   state.subscribers ||= [];
   state.fans ||= [];
+  // Older databases keep the original flexible-tip behaviour; new sites ship
+  // with the liquid-glass finish turned on.
+  state.settings.allowCustomSupport = state.settings.allowCustomSupport !== false;
+  state.settings.visualStyle = state.settings.visualStyle === 'classic' ? 'classic' : 'liquid';
+  state.settings.fontScale = normalizeFontScale(state.settings.fontScale);
   return state;
 }
 

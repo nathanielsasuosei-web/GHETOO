@@ -38,7 +38,7 @@ export default function TrackRow({ track, index, list }) {
       <div className="track__info">
         <h3>
           {track.title}
-          {track.featured ? <span className="chip" style={{ padding: '2px 8px', fontSize: 9 }}>New</span> : null}
+          {track.featured ? <span className="chip" style={{ padding: '2px 8px', fontSize: 'calc(9px * var(--ys-font-scale))' }}>New</span> : null}
           {track.lyrics ? (
             <button className="lyrics-badge" onClick={() => setShowLyrics(true)}>
               <Icon name="mic" size={11} /> Lyrics
@@ -73,11 +73,11 @@ export default function TrackRow({ track, index, list }) {
       </div>
 
       <div className="track__price">
-        from <strong style={{ color: 'var(--ivory)' }}>{cedis(track.minAmount)}</strong>
+        {track.fixedPrice ? '' : 'from '}<strong style={{ color: 'var(--ivory)' }}>{cedis(track.minAmount)}</strong>
       </div>
 
       <div className="track__actions">
-        <button className="btn btn--gold btn--sm" onClick={() => openSupport(track)}>
+        <button className="btn btn--gold btn--sm" onClick={() => openSupport(track, { amount: track.fixedPrice ? track.minAmount : undefined })}>
           <Icon name="heart" size={13} />
           Support
         </button>

@@ -84,7 +84,7 @@ export default function Overview({ data }) {
             <h3>Support, last 30 days</h3>
             <p>Confirmed payments per day.</p>
           </div>
-          <span className="mono" style={{ fontSize: 11, color: 'var(--muted)' }}>
+          <span className="mono" style={{ fontSize: 'calc(11px * var(--ys-font-scale))', color: 'var(--muted)' }}>
             {cedis(series.reduce((s, d) => s + d.amount, 0))}
           </span>
         </div>
@@ -120,7 +120,7 @@ export default function Overview({ data }) {
                 const total = Object.values(byMethod).reduce((s, v) => s + v, 0) || 1;
                 return (
                   <div key={label} style={{ marginBottom: 14 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, marginBottom: 6 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'calc(12.5px * var(--ys-font-scale))', marginBottom: 6 }}>
                       <span>{label}</span>
                       <strong>{cedis(amount)}</strong>
                     </div>
@@ -131,7 +131,7 @@ export default function Overview({ data }) {
                 );
               })
           ) : (
-            <p className="muted" style={{ fontSize: 13 }}>
+            <p className="muted" style={{ fontSize: 'calc(13px * var(--ys-font-scale))' }}>
               No confirmed support yet.
             </p>
           )}
@@ -148,14 +148,14 @@ export default function Overview({ data }) {
             byTrack.slice(0, 4).map((t) => (
               <div className="toggle-row" key={t.title}>
                 <div>
-                  <strong style={{ fontSize: 12.5 }}>{t.title}</strong>
+                  <strong style={{ fontSize: 'calc(12.5px * var(--ys-font-scale))' }}>{t.title}</strong>
                   <small>{t.count} support{t.count === 1 ? '' : 's'}</small>
                 </div>
-                <strong style={{ color: 'var(--gold)', fontSize: 13 }}>{cedis(t.amount)}</strong>
+                <strong style={{ color: 'var(--gold)', fontSize: 'calc(13px * var(--ys-font-scale))' }}>{cedis(t.amount)}</strong>
               </div>
             ))
           ) : (
-            <p className="muted" style={{ fontSize: 13 }}>
+            <p className="muted" style={{ fontSize: 'calc(13px * var(--ys-font-scale))' }}>
               Support a release to see it here.
             </p>
           )}
@@ -168,7 +168,7 @@ export default function Overview({ data }) {
             <h3>Recent support</h3>
             <p>Newest first.</p>
           </div>
-          <a className="link-arrow" href="/studio/supporters" style={{ fontSize: 11 }}>
+          <a className="link-arrow" href="/studio/supporters" style={{ fontSize: 'calc(11px * var(--ys-font-scale))' }}>
             Manage all <Icon name="arrow" size={13} />
           </a>
         </div>
@@ -215,10 +215,10 @@ export default function Overview({ data }) {
             <div key={t.id} style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
               <img src={t.cover} alt="" style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'cover' }} />
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 12.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <div style={{ fontSize: 'calc(12.5px * var(--ys-font-scale))', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {t.title}
                 </div>
-                <div className="sub" style={{ fontSize: 11, color: 'var(--muted)' }}>
+                <div className="sub" style={{ fontSize: 'calc(11px * var(--ys-font-scale))', color: 'var(--muted)' }}>
                   {compact(t.plays)} plays · {compact(t.downloads)} downloads
                 </div>
               </div>

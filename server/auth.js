@@ -23,6 +23,8 @@ export function verifySession(token) {
   if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) return null;
   try {
     const data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    // A signed fan/account token must never be replayed as a studio session.
+    if (data.role !== 'artist') return null;
     if (!data.exp || data.exp < Date.now()) return null;
     return data;
   } catch {
@@ -56,11 +58,7 @@ export function clearSessionCookie(res) {
 }
 
 export function requireAdmin(req, res, next) {
-  // Only an artist-role session opens the studio. Fan sessions use a different
-  // cookie and a different signature, but the role check keeps them separate
-  // even if a token is copied between cookies.
-  const session = readSession(req);
-  if (session?.role === 'artist') return next();
+  if (readSession(req)) return next();
   return res.status(401).json({ error: 'Not signed in' });
 }
 
