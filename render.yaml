@@ -38,3 +38,9 @@ services:
         sync: false # optional — enables real card payments
       - key: PAYSTACK_PUBLIC_KEY
         sync: false
+      - key: RESEND_API_KEY
+        sync: false # set to re_... from resend.com/api-keys — never commit the real key
+      - key: EMAIL_FROM
+        sync: false # e.g. hello@youngsilence.gh (verified in Resend)
+      - key: NOTIFY_EMAIL
+        sync: false # where new message notifications land
