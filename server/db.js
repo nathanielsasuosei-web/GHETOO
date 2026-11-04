@@ -84,6 +84,7 @@ export function getState() {
   state.merchOrders ||= [];
   state.subscribers ||= [];
   state.fans ||= [];
+  state.comments ||= [];
   // Older databases keep the original flexible-tip behaviour; new sites ship
   // with the liquid-glass finish turned on.
   state.settings.allowCustomSupport = state.settings.allowCustomSupport !== false;

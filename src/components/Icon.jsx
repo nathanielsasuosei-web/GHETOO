@@ -224,6 +224,12 @@ const paths = {
       <path d="M6.5 15c1.2 1.5 2 2.6 2 3.6a2 2 0 0 1-4 0c0-1 .8-2.1 2-3.6ZM17.5 15c1.2 1.5 2 2.6 2 3.6a2 2 0 0 1-4 0c0-1 .8-2.1 2-3.6Z" />
     </>
   ),
+  message: (
+    <>
+      <path d="M4 5.5h16a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5H8l-4 3.5v-14A1.5 1.5 0 0 1 4 5.5Z" />
+      <path d="M8 10.5h8M8 14h5" />
+    </>
+  ),
 };
 
 export default function Icon({ name, size = 20, strokeWidth = 1.6, className = '', ...rest }) {

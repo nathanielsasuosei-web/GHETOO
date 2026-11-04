@@ -37,6 +37,7 @@ import {
   verifyCard,
   MOMO_PROVIDERS,
 } from './payments.js';
+import { listComments, createComment, deleteComment, isValidComment, clampComment } from './comments.js';
 
 const ROOT = process.cwd();
 const PORT = Number(process.env.PORT || 3000);
@@ -841,6 +842,38 @@ app.post('/api/messages', (req, res) => {
   res.status(201).json({ ok: true });
 });
 
+// ---- comments (Neon Postgres when POSTGRES_URL_NO_SSL is set, JSON fallback locally)
+app.get('/api/comments', async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 200);
+    const comments = await listComments({ limit });
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ comments });
+  } catch (err) {
+    console.error('[comments] list failed:', err);
+    res.status(500).json({ error: 'Could not load comments.' });
+  }
+});
+
+app.post('/api/comments', async (req, res) => {
+  if (!rateLimit(`comment:${req.ip}`, 10, 60 * 1000)) {
+    return res.status(429).json({ error: 'Too many comments — please wait a minute.' });
+  }
+  const raw = req.body?.comment;
+  // FormData (multipart) and JSON both supported: FormData sends comment as string/file
+  const value = typeof raw === 'string' ? raw : typeof req.body?.comment === 'string' ? req.body.comment : '';
+  if (!isValidComment(value)) {
+    return res.status(400).json({ error: 'Write a comment between 1 and 2000 characters.' });
+  }
+  try {
+    const comment = await createComment(value);
+    res.status(201).json({ comment });
+  } catch (err) {
+    const status = err.status || 500;
+    res.status(status).json({ error: err.message || 'Could not save your comment.' });
+  }
+});
+
 // ---- newsletter
 app.post('/api/subscribe', (req, res) => {
   if (!rateLimit(`sub:${req.ip}`, 5, 10 * 60 * 1000)) {
@@ -1581,6 +1614,12 @@ app.delete('/api/admin/orders/:id', (req, res) => {
   if (idx === -1) return res.status(404).json({ error: 'Order not found' });
   state.orders.splice(idx, 1);
   saveNow();
+  res.json({ ok: true });
+});
+
+app.delete('/api/admin/comments/:id', async (req, res) => {
+  const ok = await deleteComment(req.params.id);
+  if (!ok) return res.status(404).json({ error: 'Comment not found' });
   res.json({ ok: true });
 });
 
