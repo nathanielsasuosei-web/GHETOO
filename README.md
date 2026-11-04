@@ -105,7 +105,7 @@ Copy `.env.example` to `.env` (or set the variables in your host) and restart:
 | `SESSION_SECRET` | Signing key for studio and fan sessions (auto-generated if unset) |
 | `PAYSTACK_SECRET_KEY` | Enables real card payments. Without it, cards run in sandbox. |
 | `PORT` | Server port (default `3000`) |
-| `DATA_DIR` | Where uploads + `db.json` live (default `./data`) |
+| `DATA_DIR` | Where uploads + `db.json` live (default `./data`). **In production point this at a persistent volume** — otherwise saved themes, settings and uploads are wiped on every restart or redeploy. |
 
 ### How payments work
 
@@ -236,9 +236,43 @@ while a fan is signed in carry a private `fanId`; older orders remain unlinked.
 Any Node host works (Render, Railway, Fly, a VPS). Build, then run `node server/index.js`
 behind HTTPS — required for card payments and for a professional look. Make sure
 `DATA_DIR` is on persistent storage, otherwise settings (including support pricing, the
-visual finish and streaming links), uploads, fan accounts and orders can be lost on restart
-or redeploy.
+theme, visual finish and streaming links), uploads, fan accounts and orders can be lost on
+restart or redeploy.
 Point Paystack's webhook at `https://your-domain/api/payments/webhook`.
+
+`render.yaml` is the Render Blueprint for the backend. It pins the service to `main` with
+`autoDeploy: true` (a blueprint applied from a feature branch otherwise keeps building that
+old branch forever), and mounts a 1 GB persistent disk at `/var/data` with
+`DATA_DIR=/var/data`. Render's **free plan cannot attach a disk**, so the Blueprint uses
+`plan: starter`; on a VPS/Railway/Fly just mount a volume and set `DATA_DIR` to its path.
+`vercel.json` proxies `/api/*` to the Render service and disables CDN caching on API
+responses, so a saved palette reaches visitors immediately. Both hosts must deploy the
+same commit.
+
+### Publishing colours to every visitor
+
+If **Studio → Appearance** says *"These colours are saved on this device only"*, the front
+end is current but the API behind it is not. The studio keeps a device copy
+(`ys-theme-v1` in localStorage) so the artist never loses a palette while a stale deploy
+catches up — but only a server-side save reaches other visitors.
+
+1. **Check the API build.** Open `https://your-api/api/health`. A current backend answers
+   with `themeStorage: true`, a `version`, and storage diagnostics
+   (`dataDirConfigured`, `dataDirWritable`, `dataBoots`, `dataSurvivedRestart`). No
+   `themeStorage` field means an older build is live. In Render: **Settings → Branch =
+   `main`** and **Manual Deploy → Deploy latest commit** (or sync the Blueprint);
+   `autoDeploy: true` then keeps it current on every push.
+2. **Check persistence.** `dataDirConfigured: false` means the API is writing to `./data`
+   on an ephemeral filesystem — every restart resets `db.json` and the theme with it. Add
+   the disk from `render.yaml` (or set `DATA_DIR` to any persistent volume) and redeploy.
+   `dataBoots` should increase across restarts; if it returns to `1`, the volume is still
+   ephemeral.
+3. **Publish again.** Back in **Studio → Appearance**, press **Publish colours** (the save
+   button stays enabled while a device-only palette exists). A save is only accepted after
+   a fresh anonymous `GET /api/site` echoes the palette — an older API returning `200`
+   while dropping `theme` can no longer report a false success. Verify in a private
+   window: `/api/site` should contain `settings.theme` and `settings.themeUpdatedAt`, and
+   the colours should be visible without signing in.
 
 ---
 

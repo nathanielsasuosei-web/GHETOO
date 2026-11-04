@@ -2572,6 +2572,17 @@ body::before {
 
 .theme-device-note {
   margin-top: 14px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.theme-device-note > span {
+  flex: 1 1 260px;
+}
+
+.theme-device-note > .btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .panel--preview {

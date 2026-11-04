@@ -6,10 +6,13 @@ import { MIN_SUPPORT_PESEWAS, MAX_SUPPORT_PESEWAS } from '../src/lib/support.js'
 import { normalizeFontScale } from '../src/lib/typography.js';
 
 const ROOT = process.cwd();
+/** Explicit DATA_DIR means the host is expected to mount a persistent volume there. */
+export const DATA_DIR_CONFIGURED = Boolean(process.env.DATA_DIR);
 export const DATA_DIR = process.env.DATA_DIR || path.join(ROOT, 'data');
 export const UPLOAD_DIR = path.join(DATA_DIR, 'uploads');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 const SECRET_FILE = path.join(DATA_DIR, '.secret');
+const BOOT_FILE = path.join(DATA_DIR, '.boots');
 
 for (const dir of [
   DATA_DIR,
@@ -23,6 +26,25 @@ for (const dir of [
 ]) {
   fs.mkdirSync(dir, { recursive: true });
 }
+
+// A tiny marker that lives and dies with the volume. If it is still there on
+// the next boot, DATA_DIR really is persistent; if it resets to 1, it is not.
+// Exposed through /api/health so a deploy can be verified from the studio.
+export const BOOT_COUNT = (() => {
+  let boots = 0;
+  try {
+    boots = Number.parseInt(fs.readFileSync(BOOT_FILE, 'utf8').trim(), 10) || 0;
+  } catch {
+    /* First boot on this volume. */
+  }
+  boots += 1;
+  try {
+    fs.writeFileSync(BOOT_FILE, String(boots));
+  } catch {
+    /* Read-only volume: the disk is not usable anyway. */
+  }
+  return boots;
+})();
 
 let state = null;
 let saveTimer = null;

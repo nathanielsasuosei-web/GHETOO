@@ -40,3 +40,43 @@ test('the appearance tab renders the owner colour controls and live preview', as
     await vite.close();
   }
 });
+
+test('a device-only palette can be republished in one click once the API is updated', async () => {
+  const vite = await createServer({
+    server: { middlewareMode: true },
+    appType: 'custom',
+    optimizeDeps: { noDiscovery: true, include: [] },
+    logLevel: 'silent',
+  });
+  const savedStorage = globalThis.localStorage;
+  try {
+    globalThis.localStorage = {
+      getItem: (key) =>
+        key === 'ys-theme-v1'
+          ? JSON.stringify({
+              theme: { accent: '#4fb3ff', glow: '#34e0c4', background: '#050c14', surface: '#0c1a27', text: '#eef7ff' },
+              savedAt: '2026-11-03T00:00:00.000Z',
+            })
+          : null,
+      setItem: () => {},
+      removeItem: () => {},
+    };
+    const { default: Appearance } = await vite.ssrLoadModule('/src/studio/Appearance.jsx');
+    const html = renderToStaticMarkup(
+      React.createElement(Appearance, {
+        // No capabilities: the deployed API is an older build.
+        data: { settings: { theme: THEME_PRESETS[0].theme } },
+        refresh: async () => {},
+        toast: () => {},
+      })
+    );
+    assert.match(html, /saved on this device only/i);
+    assert.match(html, /older build/i);
+    assert.match(html, /Publish colours/);
+    assert.match(html, /persistent/);
+  } finally {
+    if (savedStorage === undefined) delete globalThis.localStorage;
+    else globalThis.localStorage = savedStorage;
+    await vite.close();
+  }
+});

@@ -1,17 +1,35 @@
-# Render Blueprint — creates the Young Silence backend as a free web service.
+# Render Blueprint — the Young Silence backend (API + studio + uploads).
 # Docs: https://render.com/docs/blueprint-spec
+#
+# IMPORTANT: the free plan has an EPHEMERAL filesystem. It cannot attach a
+# persistent disk, so every restart/redeploy wipes db.json — including the
+# artist's saved colours, settings and uploads. That is why this service runs
+# on Starter (the smallest paid plan) with a 1 GB disk mounted at /var/data.
+# To stay on Free, remove `disk:` and set `plan: free`, but understand that
+# themes (and everything else) will revert on the next restart.
 services:
   - type: web
     name: young-silence-api
     runtime: node
-    plan: free
+    plan: starter
+    # A blueprint applied from a feature branch keeps building that branch and
+    # never picks up merged work. Pin production to main and deploy on every
+    # push so the API always runs the latest backend.
+    branch: main
     autoDeploy: true
     buildCommand: npm ci && npm run build
     startCommand: npm start
-    healthCheckPath: /api/site
+    healthCheckPath: /api/health
+    disk:
+      name: young-silence-data
+      mountPath: /var/data
+      sizeGB: 1
     envVars:
       - key: NODE_VERSION
         value: "22"
+      # Must match the disk mountPath: db.json, uploads and .secret live here.
+      - key: DATA_DIR
+        value: /var/data
       - key: ARTIST_PASSWORD
         sync: false # set this when you apply the blueprint (studio password)
       - key: SESSION_SECRET
