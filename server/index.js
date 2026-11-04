@@ -38,6 +38,7 @@ import {
   MOMO_PROVIDERS,
 } from './payments.js';
 import { listComments, createComment, deleteComment, isValidComment, clampComment } from './comments.js';
+import { sendEmail, templates, emailEnabled } from './email.js';
 
 const ROOT = process.cwd();
 const PORT = Number(process.env.PORT || 3000);
@@ -817,7 +818,7 @@ app.get('/api/download/:token', (req, res) => {
   });
 });
 
-app.post('/api/messages', (req, res) => {
+app.post('/api/messages', async (req, res) => {
   if (!rateLimit(`msg:${req.ip}`, 6, 10 * 60 * 1000)) {
     return res.status(429).json({ error: 'Too many messages — give it a few minutes.' });
   }
@@ -839,6 +840,18 @@ app.post('/api/messages', (req, res) => {
   });
   state.messages = state.messages.slice(0, 300);
   saveNow();
+
+  // Fire-and-forget studio notification (does not block response)
+  if (emailEnabled()) {
+    const notifyTo = process.env.NOTIFY_EMAIL || state.settings.contactEmail;
+    sendEmail({
+      to: notifyTo,
+      subject: `New message: ${subject || 'No subject'} — ${name}`,
+      html: templates.newMessage({ name, email, subject, body: text }),
+      replyTo: email,
+    }).catch(() => {});
+  }
+
   res.status(201).json({ ok: true });
 });
 
@@ -871,6 +884,34 @@ app.post('/api/comments', async (req, res) => {
   } catch (err) {
     const status = err.status || 500;
     res.status(status).json({ error: err.message || 'Could not save your comment.' });
+  }
+});
+
+// ---- email health / test (admin only, rate-limited, uses RESEND_API_KEY from env)
+app.get('/api/admin/email/health', (req, res) => {
+  // requireAdmin middleware already mounted for /api/admin later, but this route is above it
+  // so check session manually here for convenience
+  if (!readSession(req)) return res.status(401).json({ error: 'Studio login required' });
+  res.json({ enabled: emailEnabled(), from: process.env.EMAIL_FROM || 'onboarding@resend.dev' });
+});
+
+app.post('/api/admin/email/test', async (req, res) => {
+  if (!readSession(req)) return res.status(401).json({ error: 'Studio login required' });
+  if (!rateLimit(`email-test:${req.ip}`, 3, 60 * 60 * 1000)) {
+    return res.status(429).json({ error: 'Too many test emails — try again later.' });
+  }
+  const to = clampText(req.body?.to, 160).toLowerCase();
+  if (!emailOk(to)) return res.status(400).json({ error: 'Enter a valid recipient email.' });
+  if (!emailEnabled()) return res.status(500).json({ error: 'RESEND_API_KEY not set on server' });
+  try {
+    await sendEmail({
+      to,
+      subject: 'Hello from GHETOO',
+      html: templates.hello({ name: 'there' }),
+    });
+    res.json({ ok: true, to });
+  } catch (err) {
+    res.status(502).json({ error: err.message || 'Send failed' });
   }
 });
 
